@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  start-infrastructure.sh
-#  Unix counterpart of start-infrastructure.ps1. Same idempotency and
-#  readiness contract.
+#  start-infrastructure.sh - Unix counterpart of start-infrastructure.ps1
 # =============================================================================
 
 set -euo pipefail
@@ -10,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-EXPECTED=(ms2-plans-and-recipes-catalog-postgres ms2-plans-and-recipes-catalog-rabbitmq ms2-plans-and-recipes-catalog-consul)
+EXPECTED=(nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul)
 TIMEOUT_SECONDS=120
 
 # Count a container as ready if it is Up (no healthcheck) OR healthy.
@@ -32,13 +30,28 @@ ready_count() {
 }
 
 # Ensure the network exists.
-if ! docker network ls --format '{{.Name}}' | grep -qx 'ms2-plans-and-recipes-catalog-net'; then
-    echo "Creating network ms2-plans-and-recipes-catalog-net"
-    docker network create ms2-plans-and-recipes-catalog-net >/dev/null
+if ! docker network ls --format '{{.Name}}' | grep -qx 'nur-tricenter-net'; then
+    echo "Creating network nur-tricenter-net"
+    docker network create nur-tricenter-net >/dev/null
+fi
+
+# Remove any containers that already exist under the expected names.
+for n in "${EXPECTED[@]}"; do
+    existing=$(docker ps -a --filter "name=^${n}$" --format '{{.Names}}' | head -n1)
+    if [ -n "$existing" ]; then
+        echo "Removing existing container $n (volumes are preserved)"
+        docker rm -f "$n" >/dev/null
+    fi
+done
+
+# Ensure the postgres data volume exists.
+if ! docker volume ls --format '{{.Name}}' | grep -qx 'nur-tricenter-postgres-data'; then
+    echo "Creating volume nur-tricenter-postgres-data"
+    docker volume create nur-tricenter-postgres-data >/dev/null
 fi
 
 echo "Lifting infrastructure from docker-compose.infra.yml ..."
-docker compose -f docker-compose.infra.yml up -d --remove-orphans >/dev/null
+docker compose -f docker-compose.infra.yml up -d >/dev/null
 
 echo -n "Waiting for readiness "
 deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
@@ -51,7 +64,7 @@ while :; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
         echo ""
         echo "ERROR: infrastructure not ready within ${TIMEOUT_SECONDS}s" >&2
-        docker ps --filter "name=^ms2-plans-and-recipes-catalog-" --format 'table {{.Names}}\t{{.Status}}' >&2
+        docker ps --filter "name=^nur-tricenter-" --format 'table {{.Names}}\t{{.Status}}' >&2
         exit 1
     fi
     echo -n "."

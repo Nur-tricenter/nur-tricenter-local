@@ -1,33 +1,32 @@
 name: ms2-plans-and-recipes-catalog
 
 # =============================================================================
-#  Full stack for the Nur-Tricenter ecosystem.
+#  The ms2-plans-and-recipes-catalog microservice stack.
 #
-#  Includes docker-compose.infra.yml (Postgres, RabbitMQ, Consul) plus the
-#  three business processes:
+#  Includes docker-compose.infra.yml (Postgres + RabbitMQ + Consul, the
+#  platform containers) plus the three business processes:
 #
 #    catalog-webapi        Catalog.WebApi        net10.0
 #    catalog-workerservice Catalog.WorkerService net10.0
-#    apigateway-webapp     ApiGateway.WebApp    net10.0
+#    apigateway-webapp     ApiGateway.WebApp     net10.0  (platform, fronts the catalog)
 #
-#  The business processes are .NET 10 executables. They share the host
-#  network with the infra. Their connection strings and discovery
-#  addresses point at the infra container names (ms2-plans-and-recipes-catalog-postgres,
-#  etc.) which resolve on the shared docker network.
+#  Naming convention
+#  -----------------
+#    - Platform containers (Postgres, RabbitMQ, Consul) keep the
+#      nur-tricenter- prefix. They are shared by every microservice.
+#    - Microservice processes (catalog-webapi, catalog-workerservice) get
+#      the ms2-plans-and-recipes-catalog- prefix because they belong
+#      to this microservice.
+#    - The gateway is a platform component, not a microservice process.
+#      It is named after the platform (nur-tricenter-apigateway-webapp)
+#      even though, in this layout, it exists to front this microservice.
+#      Its bind-mount points at the actual gateway repo
+#      (../nur-tricenter-api-gateway/), NOT at a renamed directory.
 #
-#  Build vs run
-#  ------------
-#  The catalog and gateway are pre-built on the host (`dotnet build`
-#  produces the bin/Debug/net10.0 outputs) and the compose here mounts
-#  those outputs into the runtime image. This is dev-only: the Fase 7
-#  Dockerfile, when it lands, builds the images instead of mounting
-#  host binaries. The mount approach keeps the iteration loop at
-#  `dotnet build` (a few seconds) rather than `docker build` (much
-#  longer) and is the right choice while the project still changes
-#  every commit.
-#
-#  Started by start-stack.ps1 / start-stack.sh, which builds first and
-#  then calls `docker compose up`.
+#  All three business processes connect to the platform containers by
+#  their container names, which resolve on the shared nur-tricenter-net
+#  network. The database inside Postgres is ms2-plans-and-recipes-catalog
+#  (created by the init.sql in postgres-init/).
 # =============================================================================
 
 include:
@@ -36,7 +35,7 @@ include:
 services:
   catalog-webapi:
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: ms2-plans-and-recipes-catalog-catalog-webapi
+    container_name: ms2-plans-and-recipes-catalog-webapi
     hostname: catalog-webapi
     working_dir: /app
     command: ["dotnet", "Catalog.WebApi.dll"]
@@ -45,22 +44,26 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__CatalogDbConnectionString: "Host=ms2-plans-and-recipes-catalog-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
-      RabbitMqSettings__Host: "ms2-plans-and-recipes-catalog-rabbitmq"
+      # Connect to the platform Postgres, but the catalog's own database,
+      # not the default `postgres` one. Created by the init.sql that
+      # mounts at /docker-entrypoint-initdb.d inside the postgres container.
+      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
+      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
       RabbitMqSettings__UserName: "catalogUser"
       RabbitMqSettings__Password: "catalogUserPassword"
       RabbitMqSettings__VirtualHost: "/"
       RabbitMqSettings__MaxRetryAttempts: "3"
       RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
-      ServiceRegistration__ServiceDiscoveryAddress: "http://ms2-plans-and-recipes-catalog-consul:8500"
-      # Pin the host and port the catalog advertises to Consul. Without these
-      # the catalog's IServerPortResolver picks whatever Kestrel bound to,
-      # which during hosted-service startup is usually a dynamic port and
-      # makes the registration inconsistent with the gateway's expectations.
+      ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
+      # Pin the host and port the catalog advertises to Consul. Without
+      # these the catalog's IServerPortResolver picks whatever Kestrel
+      # bound to, which during hosted-service startup is usually a dynamic
+      # port and makes the registration inconsistent with the gateway's
+      # expectations.
       ServiceRegistration__Host: "catalog-webapi"
       ServiceRegistration__Port: "8080"
       ServiceRegistration__ServiceName: "catalog"
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     depends_on:
       db:
         condition: service_healthy
@@ -76,7 +79,7 @@ services:
 
   catalog-workerservice:
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: ms2-plans-and-recipes-catalog-catalog-workerservice
+    container_name: ms2-plans-and-recipes-catalog-workerservice
     hostname: catalog-workerservice
     working_dir: /app
     command: ["dotnet", "Catalog.WorkerService.dll"]
@@ -84,14 +87,14 @@ services:
       - ../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/bin/Debug/net10.0:/app:ro
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__CatalogDbConnectionString: "Host=ms2-plans-and-recipes-catalog-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
-      RabbitMqSettings__Host: "ms2-plans-and-recipes-catalog-rabbitmq"
+      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
+      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
       RabbitMqSettings__UserName: "catalogUser"
       RabbitMqSettings__Password: "catalogUserPassword"
       RabbitMqSettings__VirtualHost: "/"
       RabbitMqSettings__MaxRetryAttempts: "3"
       RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     depends_on:
       db:
         condition: service_healthy
@@ -100,24 +103,23 @@ services:
     restart: unless-stopped
 
   apigateway-webapp:
+    # The gateway is its own platform component, named after the platform
+    # (nur-tricenter), not after this microservice. It fronts the catalog
+    # today and will front other microservices as they come online.
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: ms2-plans-and-recipes-catalog-apigateway-webapp
+    container_name: nur-tricenter-apigateway-webapp
     hostname: apigateway-webapp
     working_dir: /app
     command: ["dotnet", "ApiGateway.WebApp.dll"]
     volumes:
-      # The gateway is its own repo, named after the platform (nur-tricenter-api-gateway)
-      # rather than this microservice. The container name and hostname carry the
-      # ms2-plans-and-recipes-catalog prefix because the gateway, in this layout,
-      # exists to front THIS microservice.
       - ../nur-tricenter-api-gateway/ApiGateway.WebApp/bin/Debug/net10.0:/app:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ServiceRegistration__ServiceDiscoveryAddress: "http://ms2-plans-and-recipes-catalog-consul:8500"
+      ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
     ports:
       - "15005:8080"
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     depends_on:
       consul:
         condition: service_started
@@ -130,5 +132,5 @@ services:
     restart: unless-stopped
 
 networks:
-  ms2-plans-and-recipes-catalog-net:
+  nur-tricenter-net:
     external: true

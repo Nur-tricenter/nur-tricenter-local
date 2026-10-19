@@ -1,32 +1,14 @@
 # =============================================================================
 #  start-infrastructure.ps1
-#  Brings Postgres, RabbitMQ and Consul up under the names the rest of the
-#  stack expects (ms2-plans-and-recipes-catalog-postgres / -rabbitmq / -consul).
+#  Brings up the three platform containers (Postgres + RabbitMQ + Consul)
+#  on the nur-tricenter-net docker network. Microservice processes
+#  (catalog-webapi, catalog-workerservice) and the gateway come up
+#  separately via start-stack.ps1.
 #
-#  SEMANTICS
-#  ---------
-#  This is the bootstrap step. It is destructive on the container level
-#  but PRESERVES the named volumes (postgres-data, etc.). That is the
-#  point: when you re-run the script you do not want to lose the database
-#  the catalog has been writing to.
-#
-#  What gets lost across a restart:
-#    * Messages currently in queues. catalog.default is non-durable by
-#      design (Fase 4 of the catalog), so this is expected and not a
-#      concern for the orchestrator end-to-end check.
-#    * The Consul agent's in-memory registration cache. Each WebApi
-#      re-registers itself in milliseconds on startup, so the gateway
-#      sees it again after its next 30s refresh.
-#
-#  What gets preserved:
-#    * All data in the postgres volume (the catalog's seed and any
-#      subsequent writes).
-#
-#  Why not just use `docker compose up -d`? Because the catalog's earlier
-#  containers were created by a different compose and share the same
-#  names, so `docker compose up` reports a name conflict. The right
-#  answer is to remove the old containers first, then bring the new ones
-#  up under the same names.
+#  Idempotent: if the containers are already up and ready, the script
+#  reports so and exits 0. Removes any containers under the expected
+#  names first so a half-finished session does not block the run; named
+#  volumes survive.
 # =============================================================================
 
 $ErrorActionPreference = 'Stop'
@@ -34,25 +16,33 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
-$expected = @('ms2-plans-and-recipes-catalog-postgres','ms2-plans-and-recipes-catalog-rabbitmq','ms2-plans-and-recipes-catalog-consul')
+$expected = @('nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul')
 $timeout  = (Get-Date).AddMinutes(2)
 
 # Network: create if missing; the catalog's compose uses the same name.
-if (-not (docker network ls --format '{{.Name}}' | Select-String -Quiet -SimpleMatch 'ms2-plans-and-recipes-catalog-net')) {
-    Write-Host "Creating network ms2-plans-and-recipes-catalog-net"
-    docker network create ms2-plans-and-recipes-catalog-net | Out-Null
+if (-not (docker network ls --format '{{.Name}}' | Select-String -Quiet -SimpleMatch 'nur-tricenter-net')) {
+    Write-Host "Creating network nur-tricenter-net"
+    docker network create nur-tricenter-net | Out-Null
 }
 
-# Remove any containers that already exist under the expected names. Volumes
-# named postgres-data survive this because they are not attached to a
-# running container, and `docker rm -f` only affects the container, not
-# the volume. We do the same for the two stateless containers for symmetry.
+# Remove any containers that already exist under the expected names. The
+# named volumes survive, so the database is preserved.
 foreach ($name in $expected) {
     $existing = docker ps -a --filter "name=^${name}$" --format '{{.Names}}' | Select-Object -First 1
     if ($existing) {
         Write-Host "Removing existing container $name (volumes are preserved)"
         docker rm -f $name | Out-Null
     }
+}
+
+# Make sure the postgres data volume exists with a name that the compose
+# can attach to. If it does not exist yet, `docker compose up` will create
+# it. If it exists from a previous run, attach it back to the network
+# namespace.
+$pgVol = docker volume ls --format '{{.Name}}' | Select-String -Quiet -SimpleMatch 'nur-tricenter-postgres-data'
+if (-not $pgVol) {
+    Write-Host "Creating volume nur-tricenter-postgres-data"
+    docker volume create nur-tricenter-postgres-data | Out-Null
 }
 
 Write-Host "Lifting infrastructure from docker-compose.infra.yml ..."
@@ -76,7 +66,7 @@ while ((Get-Date) -lt $timeout) {
 Write-Host ""
 
 if ($ok -lt $expected.Count) {
-    $state = docker ps -a --filter "name=^ms2-plans-and-recipes-catalog-" --format '{{.Names}} {{.Status}}'
+    $state = docker ps -a --filter "name=^nur-tricenter-" --format '{{.Names}} {{.Status}}'
     throw "Infrastructure not ready within 2 minutes. State:`n$state"
 }
 

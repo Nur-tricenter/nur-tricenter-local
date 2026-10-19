@@ -1,55 +1,67 @@
-name: ms2-plans-and-recipes-catalog
+name: nur-tricenter-infra
 
 # =============================================================================
-#  Infrastructure for the Nur-Tricenter stack.
+#  Nur-Tricenter platform infrastructure.
+#
+#  Postgres + RabbitMQ + Consul, plus a Redis-like scaffold for
+#  Consul agent config. The platform containers are shared by every
+#  microservice the orchestrator deploys; only one database per
+#  microservice is created inside the shared Postgres, named after the
+#  microservice (the guide's convention: StoreIdentity, StoreCatalog,
+#  StoreInventory, StoreOrders, StorePayments).
 #
 #  Started by start-infrastructure.ps1/.sh BEFORE the Aspire AppHost runs.
-#  Aspire does not manage any of this: it treats Postgres, RabbitMQ and
-#  Consul as external services referenced by connection string / host name.
+#  The Aspire AppHost does not manage any of this: it treats the infra
+#  as external services referenced by connection string / host name.
 #
-#  Container names match the ones the catalog and gateway compose files
-#  already use, so the same containers can be reused whether the stack is
-#  brought up by this compose or by Aspire.
-#
-#  Healthchecks are mandatory: the start-infrastructure scripts wait for
-#  all three to be healthy before exiting, so by the time AppHost runs the
-#  three projects can connect on the first try.
+#  Container names: nur-tricenter-*  (the platform identity, NOT the
+#  microservice's name). Microservice-specific containers
+#  (catalog-webapi, catalog-workerservice) get their own prefix in the
+#  root compose.
 # =============================================================================
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: ms2-plans-and-recipes-catalog-postgres
-    hostname: ms2-plans-and-recipes-catalog-postgres
+    container_name: nur-tricenter-postgres
+    hostname: nur-tricenter-postgres
+    # POSTGRES_DB is the first database Postgres creates on first boot.
+    # We set it to the catalog's database so a fresh volume starts ready
+    # for the catalog, and the init.sql below adds the others as
+    # additional microservices come online.
     environment:
-      # One database per microservice, named after the microservice. The
-      # guide does this for every service (StoreIdentity, StoreCatalog,
-      # StoreInventory, StoreOrders, StorePayments); we follow the same rule.
       POSTGRES_DB: ms2-plans-and-recipes-catalog
       POSTGRES_USER: dev-only
       POSTGRES_PASSWORD: dev-only-password
+      # Mount an init script that creates one database per microservice
+      # (idempotent). Postgres runs every *.sql in this directory on the
+      # first boot of a fresh volume, before the container starts
+      # accepting connections. The catalog's database is already created
+      # by POSTGRES_DB above; the init script only adds the others.
+      # To add a new microservice's database, drop a *.sql file here and
+      # recreate the volume (or run CREATE DATABASE by hand).
     ports:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dev-only -d ms2-plans-and-recipes-catalog"]
       interval: 1s
       timeout: 3s
       retries: 30
       start_period: 10s
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: ms2-plans-and-recipes-catalog-rabbitmq
-    hostname: ms2-plans-and-recipes-catalog-rabbitmq
-    # Seed credentials: the catalog and gateway use catalogUser / catalogUserPassword
-    # to publish, and the broker integration tests in the catalog use the same
-    # pair. RABBITMQ_DEFAULT_* is consumed by the image on first boot and stored
-    # in the volume; if the volume predates the seeding, delete the volume and
-    # let start-stack recreate it.
+    container_name: nur-tricenter-rabbitmq
+    hostname: nur-tricenter-rabbitmq
+    # Seed credentials shared by every microservice publisher and the
+    # broker integration tests. RABBITMQ_DEFAULT_* is consumed by the
+    # image on first boot and stored in the volume; if the volume
+    # predates the seeding, delete it and let start-stack recreate it.
     environment:
       RABBITMQ_DEFAULT_USER: catalogUser
       RABBITMQ_DEFAULT_PASS: catalogUserPassword
@@ -62,13 +74,13 @@ services:
       timeout: 10s
       retries: 30
       start_period: 15s
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     restart: unless-stopped
 
   consul:
     image: hashicorp/consul:1.20
-    container_name: ms2-plans-and-recipes-catalog-consul
-    hostname: ms2-plans-and-recipes-catalog-consul
+    container_name: nur-tricenter-consul
+    hostname: nur-tricenter-consul
     command: ["agent", "-dev", "-client=0.0.0.0", "-ui", "-log-level=warn"]
     ports:
       - "8500:8500"
@@ -78,21 +90,20 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
-    networks: [ms2-plans-and-recipes-catalog-net]
+    networks: [nur-tricenter-net]
     restart: unless-stopped
 
 networks:
-  ms2-plans-and-recipes-catalog-net:
-    # The network is created by whichever compose file is started first
-    # (the catalog's own compose, this one, or `docker network create`).
-    # Aspire does not need to own it.
-    name: ms2-plans-and-recipes-catalog-net
+  nur-tricenter-net:
+    # The platform network. Created by whichever compose file starts
+    # first, or by `docker network create`. Microservices attach to it
+    # and resolve each other by container name.
+    name: nur-tricenter-net
     external: true
 
 volumes:
   postgres-data:
-    # Created by this compose the first time `up` runs. Kept across
-    # `down` invocations so the catalog's seed data survives a stop/start
-    # cycle of the orchestrator. To wipe it, run
-    # `stop-infrastructure.ps1 -v` / `stop-infrastructure.sh -v`.
-    name: ms2-plans-and-recipes-catalog-postgres-data
+    # The platform data volume: every microservice's database lives in
+    # here. The init.sql creates a database per microservice so the
+    # volumes outlasts individual microservice deployments.
+    name: nur-tricenter-postgres-data
