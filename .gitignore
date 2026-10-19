@@ -1,0 +1,20 @@
+## dotnet / vs
+bin/
+obj/
+*.user
+*.suo
+
+## .NET Aspire
+.aspire/
+.cache/
+out/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+## OS
+.DS_Store
+Thumbs.db

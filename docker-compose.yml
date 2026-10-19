@@ -1,0 +1,130 @@
+name: nur-tricenter-stack
+
+# =============================================================================
+#  Full stack for the Nur-Tricenter ecosystem.
+#
+#  Includes docker-compose.infra.yml (Postgres, RabbitMQ, Consul) plus the
+#  three business processes:
+#
+#    catalog-webapi        Catalog.WebApi        net10.0
+#    catalog-workerservice Catalog.WorkerService net10.0
+#    apigateway-webapp     ApiGateway.WebApp    net10.0
+#
+#  The business processes are .NET 10 executables. They share the host
+#  network with the infra. Their connection strings and discovery
+#  addresses point at the infra container names (nur-tricenter-postgres,
+#  etc.) which resolve on the shared docker network.
+#
+#  Build vs run
+#  ------------
+#  The catalog and gateway are pre-built on the host (`dotnet build`
+#  produces the bin/Debug/net10.0 outputs) and the compose here mounts
+#  those outputs into the runtime image. This is dev-only: the Fase 7
+#  Dockerfile, when it lands, builds the images instead of mounting
+#  host binaries. The mount approach keeps the iteration loop at
+#  `dotnet build` (a few seconds) rather than `docker build` (much
+#  longer) and is the right choice while the project still changes
+#  every commit.
+#
+#  Started by start-stack.ps1 / start-stack.sh, which builds first and
+#  then calls `docker compose up`.
+# =============================================================================
+
+include:
+  - path: docker-compose.infra.yml
+
+services:
+  catalog-webapi:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    container_name: nur-tricenter-catalog-webapi
+    hostname: catalog-webapi
+    working_dir: /app
+    command: ["dotnet", "Catalog.WebApi.dll"]
+    volumes:
+      - ../ms2-plans-and-recipes-catalog/src/Catalog.WebApi/bin/Debug/net10.0:/app:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=catalog;Username=dev-only;Password=dev-only-password"
+      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
+      RabbitMqSettings__UserName: "catalogUser"
+      RabbitMqSettings__Password: "catalogUserPassword"
+      RabbitMqSettings__VirtualHost: "/"
+      RabbitMqSettings__MaxRetryAttempts: "3"
+      RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
+      ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
+      # Pin the host and port the catalog advertises to Consul. Without these
+      # the catalog's IServerPortResolver picks whatever Kestrel bound to,
+      # which during hosted-service startup is usually a dynamic port and
+      # makes the registration inconsistent with the gateway's expectations.
+      ServiceRegistration__Host: "catalog-webapi"
+      ServiceRegistration__Port: "8080"
+      ServiceRegistration__ServiceName: "catalog"
+    networks: [nur-tricenter-net]
+    depends_on:
+      db:
+        condition: service_healthy
+      consul:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  catalog-workerservice:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    container_name: nur-tricenter-catalog-workerservice
+    hostname: catalog-workerservice
+    working_dir: /app
+    command: ["dotnet", "Catalog.WorkerService.dll"]
+    volumes:
+      - ../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/bin/Debug/net10.0:/app:ro
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=catalog;Username=dev-only;Password=dev-only-password"
+      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
+      RabbitMqSettings__UserName: "catalogUser"
+      RabbitMqSettings__Password: "catalogUserPassword"
+      RabbitMqSettings__VirtualHost: "/"
+      RabbitMqSettings__MaxRetryAttempts: "3"
+      RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
+    networks: [nur-tricenter-net]
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
+
+  apigateway-webapp:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    container_name: nur-tricenter-apigateway-webapp
+    hostname: apigateway-webapp
+    working_dir: /app
+    command: ["dotnet", "ApiGateway.WebApp.dll"]
+    volumes:
+      - ../nur-tricenter-api-gateway/ApiGateway.WebApp/bin/Debug/net10.0:/app:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
+    ports:
+      - "15005:8080"
+    networks: [nur-tricenter-net]
+    depends_on:
+      consul:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+networks:
+  nur-tricenter-net:
+    external: true

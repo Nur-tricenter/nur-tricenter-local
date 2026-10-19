@@ -1,0 +1,87 @@
+name: nur-tricenter-infra
+
+# =============================================================================
+#  Infrastructure for the Nur-Tricenter stack.
+#
+#  Started by start-infrastructure.ps1/.sh BEFORE the Aspire AppHost runs.
+#  Aspire does not manage any of this: it treats Postgres, RabbitMQ and
+#  Consul as external services referenced by connection string / host name.
+#
+#  Container names match the ones the catalog and gateway compose files
+#  already use, so the same containers can be reused whether the stack is
+#  brought up by this compose or by Aspire.
+#
+#  Healthchecks are mandatory: the start-infrastructure scripts wait for
+#  all three to be healthy before exiting, so by the time AppHost runs the
+#  three projects can connect on the first try.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nur-tricenter-postgres
+    hostname: nur-tricenter-postgres
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: dev-only
+      POSTGRES_PASSWORD: dev-only-password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev-only -d catalog"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nur-tricenter-rabbitmq
+    hostname: nur-tricenter-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: nur-tricenter-consul
+    hostname: nur-tricenter-consul
+    command: ["agent", "-dev", "-client=0.0.0.0", "-ui", "-log-level=warn"]
+    ports:
+      - "8500:8500"
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+networks:
+  nur-tricenter-net:
+    # The network is created by whichever compose file is started first
+    # (the catalog's own compose, this one, or `docker network create`).
+    # Aspire does not need to own it.
+    name: nur-tricenter-net
+    external: true
+
+volumes:
+  postgres-data:
+    # Created by this compose the first time `up` runs. Kept across
+    # `down` invocations so the catalog's seed data survives a stop/start
+    # cycle of the orchestrator. To wipe it, run
+    # `stop-infrastructure.ps1 -v` / `stop-infrastructure.sh -v`.
+    name: nur-tricenter-postgres-data

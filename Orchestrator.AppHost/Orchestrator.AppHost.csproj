@@ -1,0 +1,31 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>185da2bd-3cdf-42c8-a772-a5d9f814a8ad</UserSecretsId>
+  </PropertyGroup>
+
+  <!--
+    The three business processes today. Paths are relative because each
+    repo keeps its own sln and history; the orchestrator references them
+    in place rather than cloning into ../Services (the guide's pattern
+    assumes a fresh checkout, ours assumes the repos already exist).
+
+    Adding a new microservice is two ProjectReference lines plus two
+    AddProject calls in AppHost.cs. The gateway discovers it through
+    Consul without any change here.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.WebApi\Catalog.WebApi.csproj" />
+    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.WorkerService\Catalog.WorkerService.csproj" />
+    <ProjectReference Include="..\..\nur-tricenter-api-gateway\ApiGateway.WebApp\ApiGateway.WebApp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" Version="13.6.1" />
+  </ItemGroup>
+
+</Project>
