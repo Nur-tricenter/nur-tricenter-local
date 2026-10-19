@@ -13,7 +13,7 @@ EXPECTED=(
     # Platform
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
     # Microservice processes
-    ms2-plans-and-recipes-catalog-webapi ms2-plans-and-recipes-catalog-workerservice
+    nur-tricenter-ms2-plans-and-recipes-catalog-api nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
     # Platform: gateway
     nur-tricenter-apigateway-webapp
 )

@@ -1,42 +1,43 @@
-name: ms2-plans-and-recipes-catalog
+name: nur-tricenter-infra
 
 # =============================================================================
-#  The ms2-plans-and-recipes-catalog microservice stack.
+#  Nur-Tricenter platform: shared infra + the microservice processes that
+#  run on it.
 #
-#  Includes docker-compose.infra.yml (Postgres + RabbitMQ + Consul, the
-#  platform containers) plus the three business processes:
+#  Includes docker-compose.infra.yml (Postgres + RabbitMQ + Consul) plus
+#  the three business processes of the catalog microservice:
 #
-#    catalog-webapi        Catalog.WebApi        net10.0
-#    catalog-workerservice Catalog.WorkerService net10.0
-#    apigateway-webapp     ApiGateway.WebApp     net10.0  (platform, fronts the catalog)
+#    catalog-api          Catalog.WebApi        net10.0  (microservice: catalog)
+#    catalog-workerservice Catalog.WorkerService net10.0 (microservice: catalog)
+#    apigateway-webapp    ApiGateway.WebApp     net10.0  (platform, fronts catalog)
 #
 #  Naming convention
 #  -----------------
 #    - Platform containers (Postgres, RabbitMQ, Consul) keep the
 #      nur-tricenter- prefix. They are shared by every microservice.
-#    - Microservice processes (catalog-webapi, catalog-workerservice) get
-#      the ms2-plans-and-recipes-catalog- prefix because they belong
-#      to this microservice.
-#    - The gateway is a platform component, not a microservice process.
-#      It is named after the platform (nur-tricenter-apigateway-webapp)
-#      even though, in this layout, it exists to front this microservice.
-#      Its bind-mount points at the actual gateway repo
-#      (../nur-tricenter-api-gateway/), NOT at a renamed directory.
+#    - The gateway is a platform component, named after the platform
+#      (nur-tricenter-apigateway-webapp) even though, in this layout, it
+#      fronts this microservice. Its bind-mount points at the actual
+#      gateway repo (../nur-tricenter-api-gateway/).
+#    - Microservice processes (catalog-api, catalog-workerservice) get
+#      the nur-tricenter-ms2-plans-and-recipes-catalog- prefix because
+#      they belong to this microservice.
 #
 #  All three business processes connect to the platform containers by
 #  their container names, which resolve on the shared nur-tricenter-net
 #  network. The database inside Postgres is ms2-plans-and-recipes-catalog
-#  (created by the init.sql in postgres-init/).
+#  (one database per microservice, named after the microservice, created
+#  by the init.sql in postgres-init/).
 # =============================================================================
 
 include:
   - path: docker-compose.infra.yml
 
 services:
-  catalog-webapi:
+  catalog-api:
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: ms2-plans-and-recipes-catalog-webapi
-    hostname: catalog-webapi
+    container_name: nur-tricenter-ms2-plans-and-recipes-catalog-api
+    hostname: catalog-api
     working_dir: /app
     command: ["dotnet", "Catalog.WebApi.dll"]
     volumes:
@@ -60,7 +61,7 @@ services:
       # bound to, which during hosted-service startup is usually a dynamic
       # port and makes the registration inconsistent with the gateway's
       # expectations.
-      ServiceRegistration__Host: "catalog-webapi"
+      ServiceRegistration__Host: "catalog-api"
       ServiceRegistration__Port: "8080"
       ServiceRegistration__ServiceName: "catalog"
     networks: [nur-tricenter-net]
@@ -79,7 +80,7 @@ services:
 
   catalog-workerservice:
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: ms2-plans-and-recipes-catalog-workerservice
+    container_name: nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
     hostname: catalog-workerservice
     working_dir: /app
     command: ["dotnet", "Catalog.WorkerService.dll"]

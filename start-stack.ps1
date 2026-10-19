@@ -29,7 +29,7 @@ $expected = @(
     # Platform
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     # Microservice processes
-    'ms2-plans-and-recipes-catalog-webapi','ms2-plans-and-recipes-catalog-workerservice',
+    'nur-tricenter-ms2-plans-and-recipes-catalog-api','nur-tricenter-ms2-plans-and-recipes-catalog-workerservice',
     # Platform: gateway
     'nur-tricenter-apigateway-webapp'
 )
@@ -82,4 +82,4 @@ Write-Host "Test the gateway with:"
 Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"
 Write-Host ""
 Write-Host "View tail of a service log with:"
-Write-Host "  docker logs -f ms2-plans-and-recipes-catalog-webapi"
+Write-Host "  docker logs -f nur-tricenter-ms2-plans-and-recipes-catalog-api"
