@@ -1,7 +1,8 @@
-# Nur-Tricenter Orchestrator
+# Nur-Tricenter Orchestrator: ms2-plans-and-recipes-catalog
 
-Single command to bring up the full Nur-Tricenter stack: Postgres, RabbitMQ,
-Consul, the catalog (WebApi + WorkerService) and the API Gateway. The whole
+Single command to bring up the full **ms2-plans-and-recipes-catalog**
+microservice: its own Postgres, RabbitMQ and Consul, the catalog
+(WebApi + WorkerService) and the API Gateway that fronts it. The whole
 stack runs in Docker; the three .NET 10 projects run from the host's
 `bin/Debug/net10.0` build outputs mounted into the runtime containers.
 
@@ -38,7 +39,7 @@ compose for production-like behavior.
 - Docker Desktop running.
 - .NET SDK 10.0.
 - The three sibling repos at the same level: `ms2-plans-and-recipes-catalog`
-  and `nur-tricenter-api-gateway` (this orchestrator references them by
+  and `ms2-plans-and-recipes-catalog-api-gateway` (this orchestrator references them by
   path; it does not clone them).
 
 ### Start the whole stack
@@ -51,9 +52,19 @@ compose for production-like behavior.
 powershell -File start-stack.ps1
 ```
 
+> **The catalog and the gateway are each in their own repo with their own
+> `bin/Debug` output.** The catalog lives at
+> `../ms2-plans-and-recipes-catalog/`. The gateway lives at
+> `../nur-tricenter-api-gateway/` (its own repo, named after the platform,
+> not the microservice). The compose's bind-mount for the gateway points
+> at that path; the `container_name` and `hostname` still carry the
+> `ms2-plans-and-recipes-catalog-` prefix because, in this layout, the
+> gateway exists to front this microservice.
+
 The script:
 
-1. Removes any stale containers under the expected names (volumes are kept).
+1. Removes any stale containers under the `ms2-plans-and-recipes-catalog-`
+   names (volumes are kept).
 2. Builds the three business projects.
 3. Brings up infra + the three processes via `docker compose up -d`.
 4. Applies the catalog schema with `dotnet Catalog.WebApi.dll --migrate`.
@@ -77,9 +88,9 @@ curl http://localhost:15005/health
 ### Logs
 
 ```bash
-docker logs -f nur-tricenter-catalog-webapi
-docker logs -f nur-tricenter-catalog-workerservice
-docker logs -f nur-tricenter-apigateway-webapp
+docker logs -f ms2-plans-and-recipes-catalog-catalog-webapi
+docker logs -f ms2-plans-and-recipes-catalog-catalog-workerservice
+docker logs -f ms2-plans-and-recipes-catalog-apigateway-webapp
 ```
 
 ### Tear down
@@ -92,14 +103,14 @@ docker logs -f nur-tricenter-apigateway-webapp
 ## What is where inside the stack
 
 ```
-nur-tricenter-net  (docker network, the only one)
+ms2-plans-and-recipes-catalog-net  (docker network, the only one)
   |
-  +-- nur-tricenter-postgres   :5432   (data: nur-tricenter-postgres-data)
-  +-- nur-tricenter-rabbitmq   :5672  :15672
-  +-- nur-tricenter-consul     :8500
-  +-- nur-tricenter-catalog-webapi         :8080
-  +-- nur-tricenter-catalog-workerservice
-  +-- nur-tricenter-apigateway-webapp     :8080
+  +-- ms2-plans-and-recipes-catalog-postgres   :5432   (data: ms2-plans-and-recipes-catalog-postgres-data)
+  +-- ms2-plans-and-recipes-catalog-rabbitmq   :5672  :15672
+  +-- ms2-plans-and-recipes-catalog-consul     :8500
+  +-- ms2-plans-and-recipes-catalog-catalog-webapi         :8080
+  +-- ms2-plans-and-recipes-catalog-catalog-workerservice
+  +-- ms2-plans-and-recipes-catalog-apigateway-webapp     :8080
                                         host:15005 -> 8080
 ```
 
@@ -115,7 +126,7 @@ Edit a business project, then:
 dotnet build
 
 # from the orchestrator directory
-docker compose restart nur-tricenter-catalog-webapi     # or whichever service
+docker compose restart ms2-plans-and-recipes-catalog-catalog-webapi     # or whichever service
 ```
 
 The bind-mount means the rebuilt DLLs are picked up on the next restart.
@@ -123,9 +134,9 @@ This is the dev loop until the Fase 7 Dockerfile lands.
 
 ## Adding a new microservice
 
-1. Create the new repo next to this one, e.g. `nur-tricenter-inventory`.
+1. Create the new repo next to this one, e.g. `ms2-plans-and-recipes-catalog-inventory`.
 2. Add it to the orchestrator's `Orchestrator.AppHost/Orchestrator.AppHost.csproj`
-   via `<ProjectReference Include="..\..\nur-tricenter-inventory\..." />`.
+   via `<ProjectReference Include="..\..\ms2-plans-and-recipes-catalog-inventory\..." />`.
 3. Add two `AddProject<...>(...)` calls to `AppHost.cs`.
 4. Add the corresponding compose service to `docker-compose.yml`.
 5. The Gateway discovers the new service through Consul without any change

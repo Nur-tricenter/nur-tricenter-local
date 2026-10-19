@@ -1,4 +1,4 @@
-name: nur-tricenter-infra
+name: ms2-plans-and-recipes-catalog
 
 # =============================================================================
 #  Infrastructure for the Nur-Tricenter stack.
@@ -19,10 +19,13 @@ name: nur-tricenter-infra
 services:
   db:
     image: postgres:16-alpine
-    container_name: nur-tricenter-postgres
-    hostname: nur-tricenter-postgres
+    container_name: ms2-plans-and-recipes-catalog-postgres
+    hostname: ms2-plans-and-recipes-catalog-postgres
     environment:
-      POSTGRES_DB: catalog
+      # One database per microservice, named after the microservice. The
+      # guide does this for every service (StoreIdentity, StoreCatalog,
+      # StoreInventory, StoreOrders, StorePayments); we follow the same rule.
+      POSTGRES_DB: ms2-plans-and-recipes-catalog
       POSTGRES_USER: dev-only
       POSTGRES_PASSWORD: dev-only-password
     ports:
@@ -30,18 +33,26 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev-only -d catalog"]
+      test: ["CMD-SHELL", "pg_isready -U dev-only -d ms2-plans-and-recipes-catalog"]
       interval: 1s
       timeout: 3s
       retries: 30
       start_period: 10s
-    networks: [nur-tricenter-net]
+    networks: [ms2-plans-and-recipes-catalog-net]
     restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: nur-tricenter-rabbitmq
-    hostname: nur-tricenter-rabbitmq
+    container_name: ms2-plans-and-recipes-catalog-rabbitmq
+    hostname: ms2-plans-and-recipes-catalog-rabbitmq
+    # Seed credentials: the catalog and gateway use catalogUser / catalogUserPassword
+    # to publish, and the broker integration tests in the catalog use the same
+    # pair. RABBITMQ_DEFAULT_* is consumed by the image on first boot and stored
+    # in the volume; if the volume predates the seeding, delete the volume and
+    # let start-stack recreate it.
+    environment:
+      RABBITMQ_DEFAULT_USER: catalogUser
+      RABBITMQ_DEFAULT_PASS: catalogUserPassword
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -51,13 +62,13 @@ services:
       timeout: 10s
       retries: 30
       start_period: 15s
-    networks: [nur-tricenter-net]
+    networks: [ms2-plans-and-recipes-catalog-net]
     restart: unless-stopped
 
   consul:
     image: hashicorp/consul:1.20
-    container_name: nur-tricenter-consul
-    hostname: nur-tricenter-consul
+    container_name: ms2-plans-and-recipes-catalog-consul
+    hostname: ms2-plans-and-recipes-catalog-consul
     command: ["agent", "-dev", "-client=0.0.0.0", "-ui", "-log-level=warn"]
     ports:
       - "8500:8500"
@@ -67,15 +78,15 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
-    networks: [nur-tricenter-net]
+    networks: [ms2-plans-and-recipes-catalog-net]
     restart: unless-stopped
 
 networks:
-  nur-tricenter-net:
+  ms2-plans-and-recipes-catalog-net:
     # The network is created by whichever compose file is started first
     # (the catalog's own compose, this one, or `docker network create`).
     # Aspire does not need to own it.
-    name: nur-tricenter-net
+    name: ms2-plans-and-recipes-catalog-net
     external: true
 
 volumes:
@@ -84,4 +95,4 @@ volumes:
     # `down` invocations so the catalog's seed data survives a stop/start
     # cycle of the orchestrator. To wipe it, run
     # `stop-infrastructure.ps1 -v` / `stop-infrastructure.sh -v`.
-    name: nur-tricenter-postgres-data
+    name: ms2-plans-and-recipes-catalog-postgres-data

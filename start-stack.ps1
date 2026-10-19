@@ -25,8 +25,8 @@ Set-Location $scriptDir
 # 0. Make sure no stale containers are squatting the names we need. Same
 # pattern as start-infrastructure.ps1: rm first, then up. The named
 # volumes survive.
-$expected = @('nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
-              'nur-tricenter-catalog-webapi','nur-tricenter-catalog-workerservice','nur-tricenter-apigateway-webapp')
+$expected = @('ms2-plans-and-recipes-catalog-postgres','ms2-plans-and-recipes-catalog-rabbitmq','ms2-plans-and-recipes-catalog-consul',
+              'ms2-plans-and-recipes-catalog-catalog-webapi','ms2-plans-and-recipes-catalog-catalog-workerservice','ms2-plans-and-recipes-catalog-apigateway-webapp')
 foreach ($name in $expected) {
     $existing = docker ps -a --filter "name=^${name}$" --format '{{.Names}}' | Select-Object -First 1
     if ($existing) {
@@ -35,12 +35,20 @@ foreach ($name in $expected) {
     }
 }
 
+# The compose file declares the network as external; create it here so a
+# clean host can `start-stack` without first running start-infrastructure.
+# Idempotent: docker network create fails with "already exists" only if
+# the existing one has a different configuration, which the parameter
+# --ignore-existing avoids.
+$netName = 'ms2-plans-and-recipes-catalog-net'
+docker network create --ignore-existing $netName | Out-Null
+
 # 1. Build the three business projects on the host. The compose file
 # bind-mounts the output bin/Debug/net10.0 directories.
 Write-Host "Building catalog and gateway ..."
 & dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.WebApi\Catalog.WebApi.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $scriptDir '..\nur-tricenter-api-gateway\ApiGateway.WebApp\ApiGateway.WebApp.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog-api-gateway\ApiGateway.WebApp\ApiGateway.WebApp.csproj') -c Debug | Out-Null
 
 # 2. Bring up the entire stack in one shot: infra + 3 business processes.
 Write-Host "Starting infra + business processes via docker compose ..."
@@ -48,7 +56,7 @@ docker compose up -d
 
 # 3. Apply the schema against the new Postgres. The data volume is fresh;
 # the migration creates the schemas (write, read, outbox) and the tables.
-$conn = 'Host=localhost;Port=5433;Database=catalog;Username=dev-only;Password=dev-only-password'
+$conn = 'Host=localhost;Port=5433;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password'
 $env:ConnectionStrings__CatalogDbConnectionString = $conn
 $env:ASPNETCORE_ENVIRONMENT                     = 'Development'
 
@@ -65,7 +73,7 @@ Write-Host "  - Gateway:      http://localhost:15005"
 Write-Host "  - WebApi:       internal only (reachable through the gateway as /api/catalog/...)"
 Write-Host ""
 Write-Host "Test the gateway with:"
-Write-Host "  curl http://localhost:15005/api/catalog/foods"
+Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"
 Write-Host ""
 Write-Host "View tail of a service log with:"
-Write-Host "  docker logs -f nur-tricenter-catalog-webapi"
+Write-Host "  docker logs -f ms2-plans-and-recipes-catalog-catalog-webapi"

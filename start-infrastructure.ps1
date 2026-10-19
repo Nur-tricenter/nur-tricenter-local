@@ -1,7 +1,7 @@
 # =============================================================================
 #  start-infrastructure.ps1
 #  Brings Postgres, RabbitMQ and Consul up under the names the rest of the
-#  stack expects (nur-tricenter-postgres / -rabbitmq / -consul).
+#  stack expects (ms2-plans-and-recipes-catalog-postgres / -rabbitmq / -consul).
 #
 #  SEMANTICS
 #  ---------
@@ -34,13 +34,13 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
-$expected = @('nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul')
+$expected = @('ms2-plans-and-recipes-catalog-postgres','ms2-plans-and-recipes-catalog-rabbitmq','ms2-plans-and-recipes-catalog-consul')
 $timeout  = (Get-Date).AddMinutes(2)
 
 # Network: create if missing; the catalog's compose uses the same name.
-if (-not (docker network ls --format '{{.Name}}' | Select-String -Quiet -SimpleMatch 'nur-tricenter-net')) {
-    Write-Host "Creating network nur-tricenter-net"
-    docker network create nur-tricenter-net | Out-Null
+if (-not (docker network ls --format '{{.Name}}' | Select-String -Quiet -SimpleMatch 'ms2-plans-and-recipes-catalog-net')) {
+    Write-Host "Creating network ms2-plans-and-recipes-catalog-net"
+    docker network create ms2-plans-and-recipes-catalog-net | Out-Null
 }
 
 # Remove any containers that already exist under the expected names. Volumes
@@ -76,7 +76,7 @@ while ((Get-Date) -lt $timeout) {
 Write-Host ""
 
 if ($ok -lt $expected.Count) {
-    $state = docker ps -a --filter "name=^nur-tricenter-" --format '{{.Names}} {{.Status}}'
+    $state = docker ps -a --filter "name=^ms2-plans-and-recipes-catalog-" --format '{{.Names}} {{.Status}}'
     throw "Infrastructure not ready within 2 minutes. State:`n$state"
 }
 

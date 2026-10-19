@@ -10,7 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-EXPECTED=(nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul)
+EXPECTED=(ms2-plans-and-recipes-catalog-postgres ms2-plans-and-recipes-catalog-rabbitmq ms2-plans-and-recipes-catalog-consul)
 TIMEOUT_SECONDS=120
 
 # Count a container as ready if it is Up (no healthcheck) OR healthy.
@@ -32,9 +32,9 @@ ready_count() {
 }
 
 # Ensure the network exists.
-if ! docker network ls --format '{{.Name}}' | grep -qx 'nur-tricenter-net'; then
-    echo "Creating network nur-tricenter-net"
-    docker network create nur-tricenter-net >/dev/null
+if ! docker network ls --format '{{.Name}}' | grep -qx 'ms2-plans-and-recipes-catalog-net'; then
+    echo "Creating network ms2-plans-and-recipes-catalog-net"
+    docker network create ms2-plans-and-recipes-catalog-net >/dev/null
 fi
 
 echo "Lifting infrastructure from docker-compose.infra.yml ..."
@@ -51,7 +51,7 @@ while :; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
         echo ""
         echo "ERROR: infrastructure not ready within ${TIMEOUT_SECONDS}s" >&2
-        docker ps --filter "name=^nur-tricenter-" --format 'table {{.Names}}\t{{.Status}}' >&2
+        docker ps --filter "name=^ms2-plans-and-recipes-catalog-" --format 'table {{.Names}}\t{{.Status}}' >&2
         exit 1
     fi
     echo -n "."
