@@ -1,0 +1,19 @@
+# The build context is this repository. It holds no Dockerfile of its own — it composes images
+# published elsewhere (the services, the gateway) and the platform infrastructure images.
+#
+# What matters here is not uploading anything, it is NOT hiding the files docker compose reads.
+
+.git/
+.gitignore
+.vs/
+.vscode/
+.idea/
+**/*.log
+**/.env
+**/.env.*
+**/bin/
+**/obj/
+**/TestResults/
+**/coverage/
+
+README.md

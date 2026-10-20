@@ -40,7 +40,7 @@ services:
     container_name: nur-tricenter-ms2-plans-and-recipes-catalog-api
     hostname: catalog-api
     working_dir: /app
-    command: ["dotnet", "Catalog.WebApi.dll"]
+    command: ["dotnet", "Catalog.App.dll"]
     volumes:
       - ../ms2-plans-and-recipes-catalog/src/Catalog.App/bin/Debug/net8.0:/app:ro
     environment:
