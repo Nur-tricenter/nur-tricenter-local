@@ -29,6 +29,10 @@
 SELECT 'CREATE DATABASE ms2-plans-and-recipes-catalog'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms2-plans-and-recipes-catalog')\gexec
 
+-- ONE database per microservice, matching the reference architecture: the catalog
+-- keeps its CQRS split by SCHEMA (`write`, `read`, `outbox`) inside this single
+-- database, not by a second one. Do not add a read database here.
+--
 -- Add a new microservice by adding another block here, e.g.:
 --   SELECT 'CREATE DATABASE ms2-plans-inventory'
 --   WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms2-plans-inventory')\gexec
