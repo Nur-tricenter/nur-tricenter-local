@@ -76,7 +76,7 @@ The script:
 open http://localhost:8500
 
 # RabbitMQ
-open http://localhost:15672   # catalogUser / catalogUserPassword
+open http://localhost:15672   # guest / guest
 
 # Gateway
 curl http://localhost:15005/api/catalog/v1/foods

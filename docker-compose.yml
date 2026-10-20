@@ -45,13 +45,16 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      # Swagger stays off, as it is everywhere else: the gateway has no documentation UI, so
+      # nothing in the stack consumes this document. Each service exposes its own contract when
+      # Swagger__Enabled is turned on deliberately.
       # Connect to the platform Postgres, but the catalog's own database,
       # not the default `postgres` one. Created by the init.sql that
       # mounts at /docker-entrypoint-initdb.d inside the postgres container.
       ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
       RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
-      RabbitMqSettings__UserName: "catalogUser"
-      RabbitMqSettings__Password: "catalogUserPassword"
+      RabbitMqSettings__UserName: "guest"
+      RabbitMqSettings__Password: "guest"
       RabbitMqSettings__VirtualHost: "/"
       RabbitMqSettings__MaxRetryAttempts: "3"
       RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
@@ -90,8 +93,8 @@ services:
       DOTNET_ENVIRONMENT: Development
       ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
       RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
-      RabbitMqSettings__UserName: "catalogUser"
-      RabbitMqSettings__Password: "catalogUserPassword"
+      RabbitMqSettings__UserName: "guest"
+      RabbitMqSettings__Password: "guest"
       RabbitMqSettings__VirtualHost: "/"
       RabbitMqSettings__MaxRetryAttempts: "3"
       RabbitMqSettings__RetryBaseDelayMilliseconds: "500"

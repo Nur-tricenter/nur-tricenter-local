@@ -74,7 +74,7 @@ if ($LASTEXITCODE -ne 0) { throw "Catalog schema migration failed" }
 Write-Host ""
 Write-Host "Stack ready."
 Write-Host "  - Consul UI:    http://localhost:8500"
-Write-Host "  - RabbitMQ UI:  http://localhost:15672  (catalogUser / catalogUserPassword)"
+Write-Host "  - RabbitMQ UI:  http://localhost:15672  (guest / guest)"
 Write-Host "  - Gateway:      http://localhost:15005"
 Write-Host "  - WebApi:       internal only (reachable through the gateway as /api/catalog/v1/...)"
 Write-Host ""

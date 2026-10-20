@@ -53,7 +53,7 @@ cat <<EOF
 
 Stack ready.
   - Consul UI:    http://localhost:8500
-  - RabbitMQ UI:  http://localhost:15672  (catalogUser / catalogUserPassword)
+  - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
   - WebApi:       internal only (reachable through the gateway as /api/catalog/v1/...)
 

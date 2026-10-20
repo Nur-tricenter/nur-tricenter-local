@@ -63,8 +63,8 @@ services:
     # image on first boot and stored in the volume; if the volume
     # predates the seeding, delete it and let start-stack recreate it.
     environment:
-      RABBITMQ_DEFAULT_USER: catalogUser
-      RABBITMQ_DEFAULT_PASS: catalogUserPassword
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
       - "5672:5672"
       - "15672:15672"
