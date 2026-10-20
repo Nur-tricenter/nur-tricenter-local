@@ -113,53 +113,55 @@ what you want to copy while a container is in a restart loop.
 
 ## What is where inside the stack
 
-```
-nur-tricenter-net  (the only network)
-  |
-  +-- nur-tricenter-postgres    :5432      host:5433
-  |     data volume: nur-tricenter-postgres-data
-  +-- nur-tricenter-rabbitmq    :5672      host:5672, :15672
-  +-- nur-tricenter-consul      :8500      host:8500
-  +-- nur-tricenter-catalog-api           :8080  (internal)
-  +-- nur-tricenter-catalog-workerservice :8080  (internal)
-  +-- nur-tricenter-gateway               :8080  host:15005
-```
+Everything is grouped by Docker Desktop under the compose project **`nur-tricenter`**, and each
+container's compose service name is the same word as its container name, so `docker compose ps` and
+`docker ps` never disagree:
+
+| Container | Compose service | Hostname (internal DNS) | Ports |
+|---|---|---|---|
+| `nur-tricenter-postgres` | `db` | `nur-tricenter-postgres` | host 5433 → 5432 |
+| `nur-tricenter-rabbitmq` | `rabbitmq` | `nur-tricenter-rabbitmq` | 5672, 15672 |
+| `nur-tricenter-consul` | `consul` | `nur-tricenter-consul` | 8500 |
+| `nur-tricenter-catalog-api` | `catalog-api` | `catalog-api` | internal 8080 |
+| `nur-tricenter-catalog-workerservice` | `catalog-workerservice` | `catalog-workerservice` | internal 8080 |
+| `nur-tricenter-gateway` | `gateway` | `gateway` | host 15005 → 8080 |
 
 Every container is `nur-tricenter-<what-it-is>`: the prefix says the platform, the suffix says the
 role. Nothing repeats the repository name, because a container outlives the repository it was built
 from.
 
-`hostname` is deliberately shorter — `catalog-api`, `catalog-workerservice`, `apigateway-webapp` —
-because that is what the other containers resolve through Docker DNS. Container names are
-host-visible; hostnames are network-internal.
+`hostname` drops the prefix entirely, because it only has to be unique inside the network — that is
+what the other containers resolve through Docker DNS.
 
 Only the gateway publishes a host port, because it is the sole public entry point.
 
 ## Health checks and service registration
 
-All six containers report `healthy`, and the two business processes wait on `service_healthy` for
+All six containers report `healthy`, and the business processes wait on `service_healthy` for
 Postgres and RabbitMQ rather than `service_started`.
 
 | Container | How it is checked | Notes |
 |---|---|---|
-| `postgres` | `pg_isready` | |
-| `rabbitmq` | `rabbitmq-diagnostics check_running` | |
-| `consul` | `consul members` | |
-| `catalog-api` | TCP probe to port 8080 | |
-| `gateway` | TCP probe to port 8080 | |
-| `catalog-workerservice` | `/proc/*/cmdline` | |
+| `nur-tricenter-postgres` | `pg_isready` | |
+| `nur-tricenter-rabbitmq` | `rabbitmq-diagnostics check_running` | |
+| `nur-tricenter-consul` | `consul members` | |
+| `nur-tricenter-catalog-api` | TCP probe to port 8080 | |
+| `nur-tricenter-gateway` | TCP probe to port 8080 | |
+| `nur-tricenter-catalog-workerservice` | `/proc/*/cmdline` | |
 
-Two of those deserve their reasoning recorded, because both were wrong first:
+Three of those deserve their reasoning recorded, because each was wrong first:
 
 **The probes are shell TCP checks, not `curl`.** The `aspnet` runtime image ships no curl, so a
 healthcheck calling it fails with `curl: not found` forever and marks a perfectly healthy
 application as unhealthy.
 
+**The worker check reads `/proc`, not `pgrep`.** The runtime image also lacks procps.
+
 **The worker is not registered in Consul, and that is correct.** Consul registration exists so the
 gateway can route traffic; the worker publishes to RabbitMQ and serves no HTTP at all, so it has no
 address to register. Registering it would publish a route to an endpoint that cannot answer. Its
-liveness is a container concern, so it belongs in a Docker healthcheck — and that check reads
-`/proc/*/cmdline` rather than calling `pgrep`, which the runtime image also lacks.
+liveness is a container concern, so it belongs in a Docker healthcheck — and if the
+`OutboxProcessor` dies, the outbox stops draining silently, which is exactly what this check catches.
 
 ## Iteration loop
 

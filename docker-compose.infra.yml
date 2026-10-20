@@ -1,4 +1,8 @@
-name: nur-tricenter-infra
+# Same project name as docker-compose.yml, which includes this file. Compose takes the name
+# from the FIRST file it reads, and when two files disagree the containers end up labelled with
+# whichever was read first — which is how the UI ends up grouping them under a name that matches
+# no repository.
+name: nur-tricenter
 
 # =============================================================================
 #  Nur-Tricenter platform infrastructure.

@@ -1,4 +1,6 @@
-name: nur-tricenter-infra
+# The compose project name. Docker Desktop groups every container under this label, and it
+# is the first thing visible in the UI — so it names the platform, not a single component.
+name: nur-tricenter
 
 # =============================================================================
 #  Nur-Tricenter platform: shared infra + the microservice processes that
@@ -25,10 +27,19 @@ name: nur-tricenter-infra
 #      nur-tricenter-catalog-workerservice   the same microservice, its worker
 #      nur-tricenter-gateway            platform, the single public entry point
 #
-#    `hostname` is the short form — catalog-api, catalog-workerservice,
-#    apigateway-webapp — because that is what the other containers resolve
-#    through Docker DNS. The two are deliberately different: hostname is
-#    network-internal and short, container_name is host-visible and unique.
+#    The compose SERVICE name and the container name are the same word.
+#    They used to differ (apigateway-webapp vs the container), and that is
+#    what makes `docker compose ps` disagree with `docker ps` and forces a
+#    lookup to work out which is which. One name, both places.
+#
+#    `hostname` drops the prefix entirely — catalog-api, catalog-workerservice,
+#    gateway — because that is what the other containers resolve through
+#    Docker DNS, and it only has to be unique inside this network.
+#
+#  The compose PROJECT name (top-level `name:`) is what Docker Desktop
+#  groups containers under. Keep it short and stable: it is the label every
+#  container carries in the UI, and renaming it orphans the containers that
+#  were created under the old one.
 #
 #  All three business processes connect to the platform containers by
 #  their container names, which resolve on the shared nur-tricenter-net
@@ -142,7 +153,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  apigateway-webapp:
+  gateway:
     profiles: [gateway, all]
     # The gateway is its own platform component, named after the platform
     # (nur-tricenter), not after this microservice. It fronts the catalog
@@ -153,7 +164,7 @@ services:
     # aspnet:8.0 image running a net10.0 assembly starts and then dies on a missing framework.
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     container_name: nur-tricenter-gateway
-    hostname: apigateway-webapp
+    hostname: gateway
     working_dir: /app
     command: ["dotnet", "ApiGateway.App.dll"]
     volumes:
