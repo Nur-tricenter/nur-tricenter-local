@@ -13,15 +13,22 @@ name: nur-tricenter-infra
 #
 #  Naming convention
 #  -----------------
-#    - Platform containers (Postgres, RabbitMQ, Consul) keep the
-#      nur-tricenter- prefix. They are shared by every microservice.
-#    - The gateway is a platform component, named after the platform
-#      (nur-tricenter-apigateway-webapp) even though, in this layout, it
-#      fronts this microservice. Its bind-mount points at the actual
-#      gateway repo (../nur-tricenter-api-gateway/).
-#    - Microservice processes (catalog-api, catalog-workerservice) get
-#      the nur-tricenter-ms2-plans-and-recipes-catalog- prefix because
-#      they belong to this microservice.
+#    Every container is nur-tricenter-<what-it-is>: the prefix says the
+#    platform, the suffix says the role. Nothing repeats the repository
+#    name, because a container outlives the repository it was built
+#    from and a 60-character name costs more than it explains.
+#
+#      nur-tricenter-postgres           platform, shared
+#      nur-tricenter-rabbitmq           platform, shared
+#      nur-tricenter-consul             platform, shared
+#      nur-tricenter-catalog-api        one microservice, its HTTP entry
+#      nur-tricenter-catalog-workerservice   the same microservice, its worker
+#      nur-tricenter-gateway            platform, the single public entry point
+#
+#    `hostname` is the short form — catalog-api, catalog-workerservice,
+#    apigateway-webapp — because that is what the other containers resolve
+#    through Docker DNS. The two are deliberately different: hostname is
+#    network-internal and short, container_name is host-visible and unique.
 #
 #  All three business processes connect to the platform containers by
 #  their container names, which resolve on the shared nur-tricenter-net
@@ -37,7 +44,7 @@ services:
   catalog-api:
     profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:8.0
-    container_name: nur-tricenter-ms2-plans-and-recipes-catalog-api
+    container_name: nur-tricenter-catalog-api
     hostname: catalog-api
     working_dir: /app
     command: ["dotnet", "Catalog.App.dll"]
@@ -75,7 +82,10 @@ services:
       consul:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      # A shell TCP probe, not curl. The aspnet runtime image ships no curl, so a healthcheck that
+      # calls it fails with "curl: not found" forever and the container is reported unhealthy
+      # while the application is perfectly fine. /dev/tcp is part of bash, which is present.
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -85,7 +95,7 @@ services:
   catalog-workerservice:
     profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:8.0
-    container_name: nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
+    container_name: nur-tricenter-catalog-workerservice
     hostname: catalog-workerservice
     working_dir: /app
     command: ["dotnet", "Catalog.WorkerService.dll"]
@@ -105,7 +115,31 @@ services:
       db:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        # service_healthy, not service_started: the outbox processor connects to the broker as
+        # soon as it starts, and a broker that is still booting turns the first publish attempt
+        # into an exception on every poll until it settles.
+        condition: service_healthy
+    # This process is NOT registered in Consul, and that is deliberate.
+    #
+    # Consul registration exists so the gateway can route traffic to a service. The worker
+    # publishes to RabbitMQ and serves no HTTP at all: it has no listener, no controller and no
+    # address to register. Registering it would publish a route to an endpoint that cannot
+    # answer, and the gateway would happily proxy into a black hole.
+    #
+    # Its liveness is a container concern, not a routing concern, so it belongs in a Docker
+    # healthcheck. The process is a long-running OutboxProcessor: if it exits, the outbox stops
+    # being drained and no event is ever projected. That is exactly what a restart policy is for,
+    # and it is what this check reports.
+    healthcheck:
+      # `/proc/<pid>/cmdline` rather than `pgrep`: the aspnet runtime image ships no procps, so
+      # `pgrep: not found` fails the check forever while the worker is running perfectly. Reading
+      # the kernel's own view of the process needs no extra tool. There is no port to probe
+      # either — this host has no listener.
+      test: ["CMD-SHELL", "grep -qs 'Catalog.WorkerService' /proc/*/cmdline || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   apigateway-webapp:
@@ -118,7 +152,7 @@ services:
     # does not consume the shared kernels, so it was never part of the move to net8.0. An
     # aspnet:8.0 image running a net10.0 assembly starts and then dies on a missing framework.
     image: mcr.microsoft.com/dotnet/aspnet:10.0
-    container_name: nur-tricenter-apigateway-webapp
+    container_name: nur-tricenter-gateway
     hostname: apigateway-webapp
     working_dir: /app
     command: ["dotnet", "ApiGateway.App.dll"]
@@ -135,7 +169,8 @@ services:
       consul:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      # Shell TCP probe for the same reason as the catalog API: no curl in the runtime image.
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

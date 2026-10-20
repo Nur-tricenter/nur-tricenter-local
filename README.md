@@ -103,9 +103,9 @@ half a minute after it becomes healthy.
 ## Logs
 
 ```bash
-docker logs -f nur-tricenter-ms2-plans-and-recipes-catalog-api
-docker logs -f nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
-docker logs -f nur-tricenter-apigateway-webapp
+docker logs -f nur-tricenter-catalog-api
+docker logs -f nur-tricenter-catalog-workerservice
+docker logs -f nur-tricenter-gateway
 ```
 
 `docker ps` shows container names; `docker exec` and `docker logs` also accept the short ID, which is
@@ -120,17 +120,46 @@ nur-tricenter-net  (the only network)
   |     data volume: nur-tricenter-postgres-data
   +-- nur-tricenter-rabbitmq    :5672      host:5672, :15672
   +-- nur-tricenter-consul      :8500      host:8500
-  +-- nur-tricenter-ms2-plans-and-recipes-catalog-api            :8080  (internal)
-  +-- nur-tricenter-ms2-plans-and-recipes-catalog-workerservice :8080  (internal)
-  +-- nur-tricenter-apigateway-webapp                           :8080  host:15005
+  +-- nur-tricenter-catalog-api           :8080  (internal)
+  +-- nur-tricenter-catalog-workerservice :8080  (internal)
+  +-- nur-tricenter-gateway               :8080  host:15005
 ```
 
-Only the gateway publishes a host port, because it is the sole public entry point. The business
-services are reachable only through it.
+Every container is `nur-tricenter-<what-it-is>`: the prefix says the platform, the suffix says the
+role. Nothing repeats the repository name, because a container outlives the repository it was built
+from.
 
-Naming follows one convention: platform components keep the `nur-tricenter-` prefix because they
-are shared, and a microservice's processes carry the `nur-tricenter-<service>-` prefix because they
-belong to that service.
+`hostname` is deliberately shorter — `catalog-api`, `catalog-workerservice`, `apigateway-webapp` —
+because that is what the other containers resolve through Docker DNS. Container names are
+host-visible; hostnames are network-internal.
+
+Only the gateway publishes a host port, because it is the sole public entry point.
+
+## Health checks and service registration
+
+All six containers report `healthy`, and the two business processes wait on `service_healthy` for
+Postgres and RabbitMQ rather than `service_started`.
+
+| Container | How it is checked | Notes |
+|---|---|---|
+| `postgres` | `pg_isready` | |
+| `rabbitmq` | `rabbitmq-diagnostics check_running` | |
+| `consul` | `consul members` | |
+| `catalog-api` | TCP probe to port 8080 | |
+| `gateway` | TCP probe to port 8080 | |
+| `catalog-workerservice` | `/proc/*/cmdline` | |
+
+Two of those deserve their reasoning recorded, because both were wrong first:
+
+**The probes are shell TCP checks, not `curl`.** The `aspnet` runtime image ships no curl, so a
+healthcheck calling it fails with `curl: not found` forever and marks a perfectly healthy
+application as unhealthy.
+
+**The worker is not registered in Consul, and that is correct.** Consul registration exists so the
+gateway can route traffic; the worker publishes to RabbitMQ and serves no HTTP at all, so it has no
+address to register. Registering it would publish a route to an endpoint that cannot answer. Its
+liveness is a container concern, so it belongs in a Docker healthcheck — and that check reads
+`/proc/*/cmdline` rather than calling `pgrep`, which the runtime image also lacks.
 
 ## Iteration loop
 
