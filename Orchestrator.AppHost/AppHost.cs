@@ -6,10 +6,8 @@
 //  ships a docker-compose.yml (and start-stack.sh/.ps1) that brings up
 //  the same stack in pure compose. Why both?
 //
-//  The roadmap said "tal cual la guía" (mirroring ms2026-store's
-//  Store.AppHost), which is Aspire. The compose file was kept as a
-//  documented fallback because, on a host with leftover containers
-//  from an earlier session, Aspire 13.6.1's container lifecycle
+//  Compose is kept as the primary path because, on a host with leftover
+//  containers from an earlier session, Aspire 13.6.1's container lifecycle
 //  collides with the host's docker network namespace in ways the
 //  AppHost cannot reconcile (port 5432 already bound, projects pass
 //  from Running to Finished in seconds, the AppHost's bridge network
