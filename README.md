@@ -1,21 +1,59 @@
-# Nur-Tricenter Orchestrator: ms2-plans-and-recipes-catalog
+# Nur-Tricenter: stack local
 
-Single command to bring up the full **ms2-plans-and-recipes-catalog**
-microservice: its own Postgres, RabbitMQ and Consul, the catalog
-(WebApi + WorkerService) and the API Gateway that fronts it. The whole
-stack runs in Docker; the three .NET 10 projects run from the host's
-`bin/Debug/net10.0` build outputs mounted into the runtime containers.
+Trae arriba toda la plataforma en Docker para desarrollo local: la
+infraestructura compartida (Postgres, RabbitMQ, Consul) y los procesos de
+negocio que se suscriban al perfil.
 
-## What is here
+Este repo es **solo de desarrollo local**. Nada de lo que hay acá se despliega:
+en producción el gateway y cada microservicio se publican por su cuenta.
 
-| File | What it is |
-|------|------------|
-| `Orchestrator.AppHost/` | .NET Aspire AppHost entry point. Compiles, mirrors what Aspire would do in a clean host. The README documents why the Aspire path is not the one this dev environment uses today. |
-| `docker-compose.yml` | The root compose. Includes `docker-compose.infra.yml` (Postgres + RabbitMQ + Consul) and adds the three business processes with their bind-mounted outputs. |
-| `docker-compose.infra.yml` | Just the platform containers, for cases where you want them up without the business code. |
-| `start-stack.{sh,ps1}` | The dev script: cleans stale containers, builds the three projects, brings up the whole stack, applies the catalog schema. |
-| `start-infrastructure.{sh,ps1}` | Brings up just the platform containers. |
-| `stop-infrastructure.{sh,ps1}` | Tears down the platform containers. |
+## Perfiles: agregar un microservicio no requiere tocar nada acá
+
+Cada proceso de negocio declara el perfil al que pertenece:
+
+| Perfil | Qué levanta |
+|--------|-------------|
+| (ninguno) | Solo la infraestructura: Postgres, RabbitMQ, Consul |
+| `catalog` | `catalog-api` + `catalog-workerservice` |
+| `gateway` | `apigateway-webapp` |
+
+```bash
+docker compose up                        # solo infraestructura
+docker compose --profile catalog up       # catálogo + infraestructura
+docker compose --profile gateway up       # gateway + infraestructura
+docker compose --profile catalog --profile gateway up   # los dos
+```
+
+**Por qué importa:** cuando llegue el siguiente microservicio, el equipo lo
+agrega en **su propio PR** a su propio compose, o abre uno con el perfil de su
+servicio. No hace falta que el dueño de la plataforma edite este archivo, y
+por lo tanto no hay conflictos de merge entre equipos.
+
+Si en algún momento se necesita todo junto, se pueden activar varios perfiles
+a la vez, como en el último ejemplo.
+
+## Qué hay en este repo
+
+| Archivo | Qué es |
+|---------|--------|
+| `docker-compose.yml` | Compose raíz. Incluye la infraestructura y agrega los procesos de negocio con sus binarios montados desde el host. |
+| `docker-compose.infra.yml` | Solo los contenedores de plataforma. |
+| `postgres-init/` | Script que crea una base de datos por microservicio. |
+| `start-stack.{sh,ps1}` | Script de desarrollo: limpia, construye y levanta todo. |
+| `start-infrastructure.{sh,ps1}` | Levanta solo la plataforma. |
+| `stop-infrastructure.{sh,ps1}` | Baja la plataforma. |
+| `Orchestrator.AppHost/` | AppHost de Aspire. Compila y documenta el camino de la guía; ver más abajo por qué no es el que se usa. |
+
+## Adding a microservice
+
+Un servicio nuevo necesita, de su lado:
+
+1. Un `docker-compose.yml` propio con `profiles: [<su-nombre>]`
+2. Un `CREATE DATABASE <su-nombre>` en su propio script de init
+3. Registrarse en Consul con `ServiceRegistration__ServiceName`
+
+Y de este lado: **nada**. El perfil es opt-in, así que un servicio que no
+declara perfil no aparece en ningún `up`.
 
 ## Why both Aspire and compose
 

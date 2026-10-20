@@ -35,6 +35,7 @@ include:
 
 services:
   catalog-api:
+    profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     container_name: nur-tricenter-ms2-plans-and-recipes-catalog-api
     hostname: catalog-api
@@ -82,6 +83,7 @@ services:
     restart: unless-stopped
 
   catalog-workerservice:
+    profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     container_name: nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
     hostname: catalog-workerservice
@@ -107,6 +109,7 @@ services:
     restart: unless-stopped
 
   apigateway-webapp:
+    profiles: [gateway, all]
     # The gateway is its own platform component, named after the platform
     # (nur-tricenter), not after this microservice. It fronts the catalog
     # today and will front other microservices as they come online.
