@@ -20,9 +20,7 @@
     Consul without any change here.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.WebApi\Catalog.WebApi.csproj" />
-    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.WorkerService\Catalog.WorkerService.csproj" />
-    <ProjectReference Include="..\..\nur-tricenter-api-gateway\ApiGateway.WebApp\ApiGateway.WebApp.csproj" />
+    <ProjectReference Include="..\..\nur-tricenter-api-gateway\ApiGateway.App\ApiGateway.App.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.1" />

@@ -9,7 +9,7 @@ name: nur-tricenter-infra
 #
 #    catalog-api          Catalog.WebApi        net10.0  (microservice: catalog)
 #    catalog-workerservice Catalog.WorkerService net10.0 (microservice: catalog)
-#    apigateway-webapp    ApiGateway.WebApp     net10.0  (platform, fronts catalog)
+#    apigateway-webapp    ApiGateway.App     net10.0  (platform, fronts catalog)
 #
 #  Naming convention
 #  -----------------
@@ -36,13 +36,13 @@ include:
 services:
   catalog-api:
     profiles: [catalog, all]
-    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    image: mcr.microsoft.com/dotnet/aspnet:8.0
     container_name: nur-tricenter-ms2-plans-and-recipes-catalog-api
     hostname: catalog-api
     working_dir: /app
     command: ["dotnet", "Catalog.WebApi.dll"]
     volumes:
-      - ../ms2-plans-and-recipes-catalog/src/Catalog.WebApi/bin/Debug/net10.0:/app:ro
+      - ../ms2-plans-and-recipes-catalog/src/Catalog.App/bin/Debug/net8.0:/app:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
@@ -84,13 +84,13 @@ services:
 
   catalog-workerservice:
     profiles: [catalog, all]
-    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    image: mcr.microsoft.com/dotnet/aspnet:8.0
     container_name: nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
     hostname: catalog-workerservice
     working_dir: /app
     command: ["dotnet", "Catalog.WorkerService.dll"]
     volumes:
-      - ../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/bin/Debug/net10.0:/app:ro
+      - ../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/bin/Debug/net8.0:/app:ro
     environment:
       DOTNET_ENVIRONMENT: Development
       ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
@@ -113,13 +113,17 @@ services:
     # The gateway is its own platform component, named after the platform
     # (nur-tricenter), not after this microservice. It fronts the catalog
     # today and will front other microservices as they come online.
+    #
+    # The runtime tag follows THIS project's TargetFramework, which is net10.0 — the gateway
+    # does not consume the shared kernels, so it was never part of the move to net8.0. An
+    # aspnet:8.0 image running a net10.0 assembly starts and then dies on a missing framework.
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     container_name: nur-tricenter-apigateway-webapp
     hostname: apigateway-webapp
     working_dir: /app
-    command: ["dotnet", "ApiGateway.WebApp.dll"]
+    command: ["dotnet", "ApiGateway.App.dll"]
     volumes:
-      - ../nur-tricenter-api-gateway/ApiGateway.WebApp/bin/Debug/net10.0:/app:ro
+      - ../nur-tricenter-api-gateway/ApiGateway.App/bin/Debug/net10.0:/app:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080

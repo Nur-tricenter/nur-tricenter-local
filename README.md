@@ -105,7 +105,7 @@ The script:
    names (volumes are kept).
 2. Builds the three business projects.
 3. Brings up infra + the three processes via `docker compose up -d`.
-4. Applies the catalog schema with `dotnet Catalog.WebApi.dll --migrate`.
+4. Applies the catalog schema with `dotnet Catalog.App.dll --migrate`.
 
 ### Verify
 

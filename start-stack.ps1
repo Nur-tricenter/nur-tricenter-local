@@ -48,11 +48,11 @@ $netName = 'nur-tricenter-net'
 docker network create --ignore-existing $netName | Out-Null
 
 # 1. Build the three business projects on the host. The compose file
-# bind-mounts the output bin/Debug/net10.0 directories.
+# bind-mounts the output bin/Debug/ directories.
 Write-Host "Building catalog and gateway ..."
-& dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.WebApi\Catalog.WebApi.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.App\Catalog.App.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $scriptDir '..\nur-tricenter-api-gateway\ApiGateway.WebApp\ApiGateway.WebApp.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $scriptDir '..\nur-tricenter-api-gateway\ApiGateway.App\ApiGateway.App.csproj') -c Debug | Out-Null
 
 # 2. Bring up infra + 3 business processes in one shot.
 Write-Host "Starting infra + business processes via docker compose ..."
@@ -66,9 +66,9 @@ $conn = 'Host=localhost;Port=5433;Database=ms2-plans-and-recipes-catalog;Usernam
 $env:ConnectionStrings__CatalogDbConnectionString = $conn
 $env:ASPNETCORE_ENVIRONMENT                     = 'Development'
 
-$migrateDll = Get-ChildItem -Path (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.WebApi\bin\Debug\net10.0\Catalog.WebApi.dll') | Select-Object -First 1
+$migrateDll = Get-ChildItem -Path (Join-Path $scriptDir '..\ms2-plans-and-recipes-catalog\src\Catalog.App\bin\Debug\net8.0\Catalog.App.dll') | Select-Object -First 1
 Write-Host "Applying catalog schema ..."
-& dotnet (Join-Path $migrateDll.DirectoryName 'Catalog.WebApi.dll') --migrate
+& dotnet (Join-Path $migrateDll.DirectoryName 'Catalog.App.dll') --migrate
 if ($LASTEXITCODE -ne 0) { throw "Catalog schema migration failed" }
 
 Write-Host ""
@@ -76,7 +76,7 @@ Write-Host "Stack ready."
 Write-Host "  - Consul UI:    http://localhost:8500"
 Write-Host "  - RabbitMQ UI:  http://localhost:15672  (guest / guest)"
 Write-Host "  - Gateway:      http://localhost:15005"
-Write-Host "  - WebApi:       internal only (reachable through the gateway as /api/catalog/v1/...)"
+Write-Host "  - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)"
 Write-Host ""
 Write-Host "Test the gateway with:"
 Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"

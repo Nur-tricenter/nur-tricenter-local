@@ -33,9 +33,9 @@ fi
 
 # 1. Build the three business projects.
 echo "Building catalog and gateway ..."
-dotnet build "$SCRIPT_DIR/../ms2-plans-and-recipes-catalog/src/Catalog.WebApi/Catalog.WebApi.csproj" -c Debug >/dev/null
+dotnet build "$SCRIPT_DIR/../ms2-plans-and-recipes-catalog/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$SCRIPT_DIR/../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
-dotnet build "$SCRIPT_DIR/../nur-tricenter-api-gateway/ApiGateway.WebApp/ApiGateway.WebApp.csproj" -c Debug >/dev/null
+dotnet build "$SCRIPT_DIR/../nur-tricenter-api-gateway/ApiGateway.App/ApiGateway.App.csproj" -c Debug >/dev/null
 
 # 2. Bring up infra + 3 business processes in one shot.
 echo "Starting infra + business processes via docker compose ..."
@@ -45,7 +45,7 @@ docker compose up -d
 export ConnectionStrings__CatalogDbConnectionString='Host=localhost;Port=5433;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password'
 export ASPNETCORE_ENVIRONMENT=Development
 
-MIGRATE_DLL="$SCRIPT_DIR/../ms2-plans-and-recipes-catalog/src/Catalog.WebApi/bin/Debug/net10.0/Catalog.WebApi.dll"
+MIGRATE_DLL="$SCRIPT_DIR/../ms2-plans-and-recipes-catalog/src/Catalog.App/bin/Debug/net8.0/Catalog.App.dll"
 echo "Applying catalog schema ..."
 dotnet "$MIGRATE_DLL" --migrate
 
@@ -55,7 +55,7 @@ Stack ready.
   - Consul UI:    http://localhost:8500
   - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
-  - WebApi:       internal only (reachable through the gateway as /api/catalog/v1/...)
+  - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)
 
 Test the gateway with:
   curl http://localhost:15005/api/catalog/v1/foods
