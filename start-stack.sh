@@ -12,10 +12,10 @@ cd "$SCRIPT_DIR"
 EXPECTED=(
     # Platform
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
-    # Microservice processes
-    nur-tricenter-ms2-plans-and-recipes-catalog-api nur-tricenter-ms2-plans-and-recipes-catalog-workerservice
-    # Platform: gateway
-    nur-tricenter-apigateway-webapp
+    # Microservice processes (container_name declared in docker-compose.yml)
+    nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
+    # Platform: gateway (container_name declared in docker-compose.yml)
+    nur-tricenter-gateway
 )
 for name in "${EXPECTED[@]}"; do
     if docker ps -a --filter "name=^${name}$" --format '{{.Names}}' | grep -qx "$name"; then

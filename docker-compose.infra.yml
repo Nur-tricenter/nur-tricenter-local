@@ -72,6 +72,20 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    # Topology bootstrap: declare the catalog's 5 fanout exchanges (matching what
+    # Joseco.Communication.External.RabbitMQ 1.1.0 declares at publish time:
+    # fanout, durable=false) plus the 20 consumer queues (one per microservice x
+    # exchange: ms1/ms3/ms4/ms5). The list of consumers and bindings comes from
+    # rabbitmq-definitions.json; the rabbitmq.conf file points the broker at it.
+    # Done on boot via `definitions.import_backend = local_filesystem`, the
+    # documented mechanism for 3.13+ (replaces the older RABBITMQ_LOAD_DEFINITIONS,
+    # which is no longer supported). Definitions are idempotent: the broker does
+    # NOT overwrite an already-existing entity with the same arguments, so the
+    # DefaultQueueRegistrar's `catalog.default` queue (declared by the catalog
+    # worker on its own startup) keeps working unchanged.
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 5s

@@ -28,10 +28,10 @@ Set-Location $scriptDir
 $expected = @(
     # Platform
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
-    # Microservice processes
-    'nur-tricenter-ms2-plans-and-recipes-catalog-api','nur-tricenter-ms2-plans-and-recipes-catalog-workerservice',
-    # Platform: gateway
-    'nur-tricenter-apigateway-webapp'
+    # Microservice processes (container_name declared in docker-compose.yml)
+    'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
+    # Platform: gateway (container_name declared in docker-compose.yml)
+    'nur-tricenter-gateway'
 )
 foreach ($name in $expected) {
     $existing = docker ps -a --filter "name=^${name}$" --format '{{.Names}}' | Select-Object -First 1
@@ -82,4 +82,4 @@ Write-Host "Test the gateway with:"
 Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"
 Write-Host ""
 Write-Host "View tail of a service log with:"
-Write-Host "  docker logs -f nur-tricenter-ms2-plans-and-recipes-catalog-api"
+Write-Host "  docker logs -f nur-tricenter-catalog-api"

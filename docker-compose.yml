@@ -53,7 +53,6 @@ include:
 
 services:
   catalog-api:
-    profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:8.0
     container_name: nur-tricenter-catalog-api
     hostname: catalog-api
@@ -77,6 +76,12 @@ services:
       RabbitMqSettings__VirtualHost: "/"
       RabbitMqSettings__MaxRetryAttempts: "3"
       RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
+      # Seed the sample catalogue (30 foods / 25 recipes / 2 plans) on startup so the seed
+      # events land in the transactional outbox, are drained by the catalog worker, and reach
+      # the broker's fanout exchanges (meal-plan-published, food-published, recipe-published,
+      # recipe-updated, food-nutritional-info-updated). The topology that fans those out to
+      # ms1/ms3/ms4/ms5 is declared by rabbitmq-definitions.json at broker boot.
+      Seed__Enabled: "true"
       ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
       # Pin the host and port the catalog advertises to Consul. Without
       # these the catalog's IServerPortResolver picks whatever Kestrel
@@ -104,7 +109,6 @@ services:
     restart: unless-stopped
 
   catalog-workerservice:
-    profiles: [catalog, all]
     image: mcr.microsoft.com/dotnet/aspnet:8.0
     container_name: nur-tricenter-catalog-workerservice
     hostname: catalog-workerservice
@@ -154,14 +158,9 @@ services:
     restart: unless-stopped
 
   gateway:
-    profiles: [gateway, all]
-    # The gateway is its own platform component, named after the platform
-    # (nur-tricenter), not after this microservice. It fronts the catalog
-    # today and will front other microservices as they come online.
-    #
-    # The runtime tag follows THIS project's TargetFramework, which is net10.0 — the gateway
-    # does not consume the shared kernels, so it was never part of the move to net8.0. An
-    # aspnet:8.0 image running a net10.0 assembly starts and then dies on a missing framework.
+    # The runtime tag follows THIS project's TargetFramework (net10.0): the gateway
+    # does not consume the shared kernels, so it was never part of the move to net8.0.
+    # An aspnet:8.0 image running a net10.0 assembly starts and dies on a missing framework.
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     container_name: nur-tricenter-gateway
     hostname: gateway
