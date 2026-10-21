@@ -1,14 +1,10 @@
 -- =============================================================================
---  One database per microservice, named after the microservice.
---
---  The guide this orchestrator mirrors (ms2026-store) does this for every
---  one of its 5 services: StoreIdentity, StoreCatalog, StoreInventory,
---  StoreOrders, StorePayments. The catalog microservice that this
---  compose ships today is "ms2-plans-and-recipes-catalog", so this script
---  creates that database. When the next microservice (e.g. inventory)
---  comes online, drop a new *.sql file in the same directory with its
---  database name; Postgres will run it on the next fresh boot of the
---  postgres volume.
+--  One database per microservice, named after the microservice. The
+--  catalog microservice that this compose ships today is
+--  "ms2-plans-and-recipes-catalog", so this script creates that
+--  database. When the next microservice (e.g. inventory) comes online,
+--  drop a new *.sql file in the same directory with its database name;
+--  Postgres will run it on the next fresh boot of the postgres volume.
 --
 --  Why this lives here and not in the catalog's --migrate step: the
 --  microservice's startup migration runs AFTER the container is up, and

@@ -1,4 +1,4 @@
-﻿{
+{
   "rabbitmq_version": "3.13.0",
   "exchanges": [
     {
@@ -48,57 +48,329 @@
     }
   ],
   "queues": [
-    { "name": "ms1.meal-plan-published",                "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms1.food-nutritional-info-updated",      "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms1.recipe-published",                  "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms1.recipe-updated",                    "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms1.food-published",                     "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms3.meal-plan-published",                "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms3.food-nutritional-info-updated",      "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms3.recipe-published",                  "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms3.recipe-updated",                    "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms3.food-published",                     "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms4.meal-plan-published",                "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms4.food-nutritional-info-updated",      "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms4.recipe-published",                  "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms4.recipe-updated",                    "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms4.food-published",                     "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms5.meal-plan-published",                "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms5.food-nutritional-info-updated",      "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms5.recipe-published",                  "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms5.recipe-updated",                    "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "ms5.food-published",                     "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+    {
+      "name": "ms1.meal-plan-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms1.food-nutritional-info-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms1.recipe-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms1.recipe-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms1.food-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms3.meal-plan-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms3.food-nutritional-info-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms3.recipe-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms3.recipe-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms3.food-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms4.meal-plan-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms4.food-nutritional-info-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms4.recipe-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms4.recipe-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms4.food-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms5.meal-plan-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms5.food-nutritional-info-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms5.recipe-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms5.recipe-updated",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "ms5.food-published",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
   ],
   "bindings": [
-    { "source": "meal-plan-published",               "vhost": "/", "destination": "ms1.meal-plan-published",               "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-nutritional-info-updated",     "vhost": "/", "destination": "ms1.food-nutritional-info-updated",     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-published",                  "vhost": "/", "destination": "ms1.recipe-published",                  "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-updated",                    "vhost": "/", "destination": "ms1.recipe-updated",                    "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-published",                    "vhost": "/", "destination": "ms1.food-published",                     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "meal-plan-published",               "vhost": "/", "destination": "ms3.meal-plan-published",               "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-nutritional-info-updated",     "vhost": "/", "destination": "ms3.food-nutritional-info-updated",     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-published",                  "vhost": "/", "destination": "ms3.recipe-published",                  "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-updated",                    "vhost": "/", "destination": "ms3.recipe-updated",                    "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-published",                    "vhost": "/", "destination": "ms3.food-published",                     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "meal-plan-published",               "vhost": "/", "destination": "ms4.meal-plan-published",               "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-nutritional-info-updated",     "vhost": "/", "destination": "ms4.food-nutritional-info-updated",     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-published",                  "vhost": "/", "destination": "ms4.recipe-published",                  "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-updated",                    "vhost": "/", "destination": "ms4.recipe-updated",                    "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-published",                    "vhost": "/", "destination": "ms4.food-published",                     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "meal-plan-published",               "vhost": "/", "destination": "ms5.meal-plan-published",               "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-nutritional-info-updated",     "vhost": "/", "destination": "ms5.food-nutritional-info-updated",     "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-published",                  "vhost": "/", "destination": "ms5.recipe-published",                  "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "recipe-updated",                    "vhost": "/", "destination": "ms5.recipe-updated",                    "destination_type": "queue", "routing_key": "", "arguments": {} },
-    { "source": "food-published",                    "vhost": "/", "destination": "ms5.food-published",                     "destination_type": "queue", "routing_key": "", "arguments": {} }
+    {
+      "source": "meal-plan-published",
+      "vhost": "/",
+      "destination": "ms1.meal-plan-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-nutritional-info-updated",
+      "vhost": "/",
+      "destination": "ms1.food-nutritional-info-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-published",
+      "vhost": "/",
+      "destination": "ms1.recipe-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-updated",
+      "vhost": "/",
+      "destination": "ms1.recipe-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-published",
+      "vhost": "/",
+      "destination": "ms1.food-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal-plan-published",
+      "vhost": "/",
+      "destination": "ms3.meal-plan-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-nutritional-info-updated",
+      "vhost": "/",
+      "destination": "ms3.food-nutritional-info-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-published",
+      "vhost": "/",
+      "destination": "ms3.recipe-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-updated",
+      "vhost": "/",
+      "destination": "ms3.recipe-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-published",
+      "vhost": "/",
+      "destination": "ms3.food-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal-plan-published",
+      "vhost": "/",
+      "destination": "ms4.meal-plan-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-nutritional-info-updated",
+      "vhost": "/",
+      "destination": "ms4.food-nutritional-info-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-published",
+      "vhost": "/",
+      "destination": "ms4.recipe-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-updated",
+      "vhost": "/",
+      "destination": "ms4.recipe-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-published",
+      "vhost": "/",
+      "destination": "ms4.food-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal-plan-published",
+      "vhost": "/",
+      "destination": "ms5.meal-plan-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-nutritional-info-updated",
+      "vhost": "/",
+      "destination": "ms5.food-nutritional-info-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-published",
+      "vhost": "/",
+      "destination": "ms5.recipe-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "recipe-updated",
+      "vhost": "/",
+      "destination": "ms5.recipe-updated",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "food-published",
+      "vhost": "/",
+      "destination": "ms5.food-published",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
   ],
   "vhosts": [
-    { "name": "/" }
+    {
+      "name": "/"
+    }
   ],
   "users": [
-    { "name": "guest", "password_hash": "", "tags": ["administrator"] }
+    {
+      "name": "guest",
+      "password_hash": "",
+      "tags": ["administrator"]
+    }
   ],
   "permissions": [
-    { "user": "guest", "vhost": "/", "configure": ".*", "read": ".*", "write": ".*" }
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "read": ".*",
+      "write": ".*"
+    }
   ],
   "policies": [],
   "global_parameters": [],
