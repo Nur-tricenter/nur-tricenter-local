@@ -1,0 +1,34 @@
+# =============================================================================
+#  Dev profile for the orchestrator.
+#
+#  Layered on top of docker-compose.yml with `-f`. Used only when you explicitly
+#  want the catalog's OpenAPI document on the workstation.
+#
+#    start-stack.ps1         -> base compose. Swagger OFF, no extra port.
+#    start-stack-dev.ps1     -> base + this file. Swagger ON at :18080.
+#
+#  This file only overrides what is dev-specific. The infra (postgres,
+#  rabbit, consul) and the business services come from the base compose.
+#
+#  Do not push the dev profile into a deployment pipeline. The whole point of
+#  splitting the file is that production composes never include it.
+# =============================================================================
+
+services:
+  catalog-api:
+    # Mirror the catalog-api service from the base compose, only override the
+    # two things that change between dev and prod: the Swagger flag and the
+    # host port mapping that makes /swagger reachable from the workstation.
+    environment:
+      # `Swagger stays off, as it is everywhere else: the gateway has no
+      # documentation UI`. This file flips it ON, locally. Other replicas of
+      # the same service (one per active profile) inherit the doc, but every
+      # other consumer of the API surface is documented in code, not in an
+      # OpenAPI document served by the running process.
+      Swagger__Enabled: "true"
+    # Expose the catalog process on the host. Useful for hitting
+    # http://localhost:18080/swagger straight from the workstation. The
+    # gateway route at :15005 stays the default entry point for application
+    # traffic; this mapping is dev-only convenience.
+    ports:
+      - "18080:8080"

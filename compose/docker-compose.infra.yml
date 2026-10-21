@@ -1,0 +1,145 @@
+# Same project name as docker-compose.yml, which includes this file. Compose takes the name
+# from the FIRST file it reads, and when two files disagree the containers end up labelled with
+# whichever was read first — which is how the UI ends up grouping them under a name that matches
+# no repository.
+name: nur-tricenter
+
+# =============================================================================
+#  Nur-Tricenter platform infrastructure.
+#
+#  Postgres + RabbitMQ + Consul, plus a Redis-like scaffold for
+#  Consul agent config. The platform containers are shared by every
+#  microservice the orchestrator deploys; only one database per
+#  microservice is created inside the shared Postgres, named after the
+#  microservice (the guide's convention: StoreIdentity, StoreCatalog,
+#  StoreInventory, StoreOrders, StorePayments).
+#
+#  Started by start-infrastructure.ps1/.sh BEFORE the Aspire AppHost runs.
+#  The Aspire AppHost does not manage any of this: it treats the infra
+#  as external services referenced by connection string / host name.
+#
+#  Container names: nur-tricenter-*  (the platform identity, NOT the
+#  microservice's name). Microservice-specific containers
+#  (catalog-webapi, catalog-workerservice) get their own prefix in the
+#  root compose.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nur-tricenter-postgres
+    hostname: nur-tricenter-postgres
+    # POSTGRES_DB is the first database Postgres creates on first boot.
+    # We set it to the catalog's database so a fresh volume starts ready
+    # for the catalog, and the init.sql below adds the others as
+    # additional microservices come online.
+    environment:
+      POSTGRES_DB: ms2-plans-and-recipes-catalog
+      POSTGRES_USER: dev-only
+      POSTGRES_PASSWORD: dev-only-password
+      # Mount an init script that creates one database per microservice
+      # (idempotent). Postgres runs every *.sql in this directory on the
+      # first boot of a fresh volume, before the container starts
+      # accepting connections. The catalog's database is already created
+      # by POSTGRES_DB above; the init script only adds the others.
+      # To add a new microservice's database, drop a *.sql file here and
+      # recreate the volume (or run CREATE DATABASE by hand).
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../topology/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev-only -d ms2-plans-and-recipes-catalog"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nur-tricenter-rabbitmq
+    hostname: nur-tricenter-rabbitmq
+    # Seed credentials shared by every microservice publisher and the
+    # broker integration tests. RABBITMQ_DEFAULT_* is consumed by the
+    # image on first boot and stored in the volume; if the volume
+    # predates the seeding, delete it and let start-stack recreate it.
+    #
+    # The Erlang cookie (/var/lib/rabbitmq/.erlang.cookie) is created by
+    # the image's entrypoint as the rabbitmq user with permissions 0400
+    # owned by uid 999. On Docker Desktop with the WSL2 backend that file
+    # ends up with group:root and the broker then crashes at boot with
+    # "Error when reading /var/lib/rabbitmq/.erlang.cookie: eacces",
+    # because the Erlang VM running as root is not in the rabbitmq group.
+    #
+    # The fix has two parts:
+    #
+    # 1. user: "0:0" — run the broker process as root. local-dev only.
+    # 2. command — chmod the cookie AFTER the entrypoint creates it. The
+    #    entrypoint writes the file before yielding to the command, so
+    #    `chmod 0666` here makes it readable to whoever runs (root or
+    #    rabbitmq) without further drama. The cookie is dev-only data;
+    #    making it world-readable is acceptable here and NOT in prod.
+    user: "0:0"
+    command: ["bash", "-c", "chmod 0666 /var/lib/rabbitmq/.erlang.cookie; exec /opt/rabbitmq/sbin/rabbitmq-server"]
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    # Topology bootstrap: declare the catalog's 5 fanout exchanges (matching what
+    # Joseco.Communication.External.RabbitMQ 1.1.0 declares at publish time:
+    # fanout, durable=false) plus the 20 consumer queues (one per microservice x
+    # exchange: ms1/ms3/ms4/ms5). The list of consumers and bindings comes from
+    # rabbitmq-definitions.json; the rabbitmq.conf file points the broker at it.
+    # Done on boot via `definitions.import_backend = local_filesystem`, the
+    # documented mechanism for 3.13+ (replaces the older RABBITMQ_LOAD_DEFINITIONS,
+    # which is no longer supported). Definitions are idempotent: the broker does
+    # NOT overwrite an already-existing entity with the same arguments, so the
+    # DefaultQueueRegistrar's `catalog.default` queue (declared by the catalog
+    # worker on its own startup) keeps working unchanged.
+    volumes:
+      - ../topology/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ../topology/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: nur-tricenter-consul
+    hostname: nur-tricenter-consul
+    command: ["agent", "-dev", "-client=0.0.0.0", "-ui", "-log-level=warn"]
+    ports:
+      - "8500:8500"
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks: [nur-tricenter-net]
+    restart: unless-stopped
+
+networks:
+  nur-tricenter-net:
+    # The platform network. Created by whichever compose file starts
+    # first, or by `docker network create`. Microservices attach to it
+    # and resolve each other by container name.
+    name: nur-tricenter-net
+    external: true
+
+volumes:
+  postgres-data:
+    # The platform data volume: every microservice's database lives in
+    # here. The init.sql creates a database per microservice so the
+    # volumes outlasts individual microservice deployments.
+    name: nur-tricenter-postgres-data
