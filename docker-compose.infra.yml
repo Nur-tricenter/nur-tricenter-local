@@ -66,6 +66,24 @@ services:
     # broker integration tests. RABBITMQ_DEFAULT_* is consumed by the
     # image on first boot and stored in the volume; if the volume
     # predates the seeding, delete it and let start-stack recreate it.
+    #
+    # The Erlang cookie (/var/lib/rabbitmq/.erlang.cookie) is created by
+    # the image's entrypoint as the rabbitmq user with permissions 0400
+    # owned by uid 999. On Docker Desktop with the WSL2 backend that file
+    # ends up with group:root and the broker then crashes at boot with
+    # "Error when reading /var/lib/rabbitmq/.erlang.cookie: eacces",
+    # because the Erlang VM running as root is not in the rabbitmq group.
+    #
+    # The fix has two parts:
+    #
+    # 1. user: "0:0" — run the broker process as root. local-dev only.
+    # 2. command — chmod the cookie AFTER the entrypoint creates it. The
+    #    entrypoint writes the file before yielding to the command, so
+    #    `chmod 0666` here makes it readable to whoever runs (root or
+    #    rabbitmq) without further drama. The cookie is dev-only data;
+    #    making it world-readable is acceptable here and NOT in prod.
+    user: "0:0"
+    command: ["bash", "-c", "chmod 0666 /var/lib/rabbitmq/.erlang.cookie; exec /opt/rabbitmq/sbin/rabbitmq-server"]
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest

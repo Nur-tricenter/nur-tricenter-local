@@ -91,6 +91,12 @@ services:
       ServiceRegistration__Host: "catalog-api"
       ServiceRegistration__Port: "8080"
       ServiceRegistration__ServiceName: "catalog"
+      # This is local-dev compose: the catalog's own appsettings.Development.template.json
+      # sets Migrations__ApplyOnStartup=true exactly for this case. The default in
+      # appsettings.json is false because "a web process is a mediocre place to run DDL",
+      # but here the catalog-api container IS the local dev environment, so letting it
+      # migrate on boot removes the need to hand-run the migration before docker compose up.
+      Migrations__ApplyOnStartup: "true"
     networks: [nur-tricenter-net]
     depends_on:
       db:

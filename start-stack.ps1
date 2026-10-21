@@ -43,9 +43,13 @@ foreach ($name in $expected) {
 
 # Create the platform network if it does not exist; compose declares it as
 # external, so a clean host can `start-stack` without first running
-# start-infrastructure. Idempotent.
+# start-infrastructure. Idempotent. Docker 29.x dropped the
+# `--ignore-existing` flag; inspect-then-create handles both branches.
 $netName = 'nur-tricenter-net'
-docker network create --ignore-existing $netName | Out-Null
+$existingNet = docker network ls --filter "name=^${netName}$" --format '{{.Name}}' | Select-Object -First 1
+if (-not $existingNet) {
+    docker network create $netName | Out-Null
+}
 
 # 1. Build the three business projects on the host. The compose file
 # bind-mounts the output bin/Debug/ directories.
@@ -55,13 +59,24 @@ Write-Host "Building catalog and gateway ..."
 & dotnet build (Join-Path $scriptDir '..\nur-tricenter-api-gateway\ApiGateway.App\ApiGateway.App.csproj') -c Debug | Out-Null
 
 # 2. Bring up infra + 3 business processes in one shot.
+# Pin the project name explicitly: the compose file declares it, but
+# passing it on the CLI guards against the warning "volume was created
+# for project X, expected nur-tricenter" when the working directory is
+# named something else.
 Write-Host "Starting infra + business processes via docker compose ..."
-docker compose up -d
+docker compose -p nur-tricenter up -d
 
 # 3. Apply the schema. The migration runs on the host against the
 # platform postgres's catalog database. Inside docker, the database is
 # reachable at localhost:5433 because the compose maps the container
 # port 5432 to the host.
+#
+# Since this compose sets Migrations__ApplyOnStartup=true on the
+# catalog-api container, the container applies the migration itself
+# during boot. Running --migrate here is belt-and-suspenders: it makes
+# the schema visible to other tools (psql, Entity Framework designer)
+# before any container restarts, and it stays idempotent because the
+# migrator is a no-op when no new migration is pending.
 $conn = 'Host=localhost;Port=5433;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password'
 $env:ConnectionStrings__CatalogDbConnectionString = $conn
 $env:ASPNETCORE_ENVIRONMENT                     = 'Development'

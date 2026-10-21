@@ -359,7 +359,7 @@
   "users": [
     {
       "name": "guest",
-      "password_hash": "",
+      "password_hash": "4bVMFfBcXo4iO30CTrIU1LPh6th7NMFzp7tVRFquXE5W/UR6",
       "tags": ["administrator"]
     }
   ],
