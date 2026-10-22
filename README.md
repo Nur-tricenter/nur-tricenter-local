@@ -99,9 +99,46 @@ On this side: **nothing**. A profile is opt-in, so a service that declares no pr
 ## Prerequisites
 
 - Docker Desktop running.
-- .NET SDK 8 and 10 — the catalog targets `net8.0`, the gateway `net10.0`.
-- The sibling repositories at the same level: `ms2-plans-and-recipes-catalog` and
-  `nur-tricenter-api-gateway`. This orchestrator references them by path; it does not clone them.
+- .NET SDK 8 and 10 — the catalog and identity target `net8.0`, the gateway `net10.0`.
+- The four sibling repositories. This orchestrator references them by relative path, so they
+  have to be present next to it. `scripts/setup-project.sh` clones them for you (see below).
+
+## First time setup
+
+The stack spans five repositories and compose reaches into each one with a relative path
+(`../ms2-plans-and-recipes-catalog/catalog.compose.yml`, and so on). Cloning this
+repository alone therefore produces a stack that cannot start, and the error names
+compose syntax rather than the missing directories.
+
+```bash
+# Unix
+./scripts/setup-project.sh
+
+# Windows PowerShell
+.\scripts\setup-project.ps1
+```
+
+The script is idempotent: a repository already present is left alone, so it is safe to
+re-run after pulling changes in one of them. It also reports whether `NUGET_TOKEN` is
+defined, because the platform kernels are private GitHub Packages.
+
+> `nur-tricenter-identity` is not published yet. `setup-project` will fail on it until
+> the repository exists and is pushed.
+
+### Private feed credentials
+
+```bash
+# Unix
+export NUGET_USERNAME="your-github-user"
+export NUGET_TOKEN="a-token-with-read:packages"
+
+# Windows PowerShell
+[Environment]::SetEnvironmentVariable("NUGET_USERNAME", "your-github-user", "User")
+[Environment]::SetEnvironmentVariable("NUGET_TOKEN",   "your-token",        "User")
+```
+
+One name across all four repositories. The token is only read from your environment —
+never written to a file in version control.
 
 ## Starting the stack
 
