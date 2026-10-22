@@ -331,6 +331,24 @@
                        "arguments":  {
 
                                      }
+                   },
+                   {
+                       "name":  "ms2.user-published",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms2.user-updated",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
                    }
                ],
     "bindings":  [
@@ -608,6 +626,26 @@
                          "source":  "user-updated",
                          "vhost":  "/",
                          "destination":  "ms5.user-updated",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "user-published",
+                         "vhost":  "/",
+                         "destination":  "ms2.user-published",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "user-updated",
+                         "vhost":  "/",
+                         "destination":  "ms2.user-updated",
                          "destination_type":  "queue",
                          "routing_key":  "",
                          "arguments":  {
