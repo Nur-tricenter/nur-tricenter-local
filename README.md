@@ -252,6 +252,5 @@ environment-variable names.
 
 ## See also
 
-- `ROADMAP-MS2026.md` (in the catalog repository) — the project-wide state and gap plan.
-- `ANALISIS-ARQUITECTURA-MS2026.md` (in the catalog repository) — the guide this mirrors.
+- `ANALISIS-ARQUITECTURA-MS2026.md` (in the workspace root) — the architecture analysis this stack implements.
 - `nur-tricenter-shared-kernels` — the platform libraries, consumed as NuGet packages.

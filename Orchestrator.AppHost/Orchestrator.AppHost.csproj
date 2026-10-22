@@ -10,17 +10,25 @@
   </PropertyGroup>
 
   <!--
-    The three business processes today. Paths are relative because each
-    repo keeps its own sln and history; the orchestrator references them
-    in place rather than cloning into ../Services (the guide's pattern
-    assumes a fresh checkout, ours assumes the repos already exist).
+    The business processes. Paths are relative because each repo keeps its
+    own sln and history; the orchestrator references them in place rather
+    than cloning into ../Services.
 
     Adding a new microservice is two ProjectReference lines plus two
     AddProject calls in AppHost.cs. The gateway discovers it through
     Consul without any change here.
+
+    Aspire derives the Projects.* class name from the PROJECT FILE name,
+    not from the folder or the assembly: Identity.App.csproj is
+    Projects.Identity_App (dots become underscores), which is why the
+    AppHost says Identity_App even though the service is "identity".
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\nur-tricenter-api-gateway\ApiGateway.App\ApiGateway.App.csproj" />
+    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.App\Catalog.App.csproj" />
+    <ProjectReference Include="..\..\ms2-plans-and-recipes-catalog\src\Catalog.WorkerService\Catalog.WorkerService.csproj" />
+    <ProjectReference Include="..\..\nur-tricenter-identity\src\Identity.App\Identity.App.csproj" />
+    <ProjectReference Include="..\..\nur-tricenter-identity\src\Identity.WorkerService\Identity.WorkerService.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" Version="13.6.1" />

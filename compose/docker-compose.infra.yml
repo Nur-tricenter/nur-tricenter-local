@@ -11,8 +11,7 @@ name: nur-tricenter
 #  Consul agent config. The platform containers are shared by every
 #  microservice the orchestrator deploys; only one database per
 #  microservice is created inside the shared Postgres, named after the
-#  microservice (the guide's convention: StoreIdentity, StoreCatalog,
-#  StoreInventory, StoreOrders, StorePayments).
+#  microservice that owns it.
 #
 #  Started by start-infrastructure.ps1/.sh BEFORE the Aspire AppHost runs.
 #  The Aspire AppHost does not manage any of this: it treats the infra
@@ -77,13 +76,26 @@ services:
     # The fix has two parts:
     #
     # 1. user: "0:0" — run the broker process as root. local-dev only.
-    # 2. command — chmod the cookie AFTER the entrypoint creates it. The
-    #    entrypoint writes the file before yielding to the command, so
-    #    `chmod 0666` here makes it readable to whoever runs (root or
-    #    rabbitmq) without further drama. The cookie is dev-only data;
-    #    making it world-readable is acceptable here and NOT in prod.
+    # 2. command — chmod the cookie AFTER the entrypoint creates it, to
+    #    exactly 0400.
+    #
+    # 0400, and this is not a stylistic choice: the Erlang VM REFUSES to
+    # start when the cookie is readable by group or other. A previous version
+    # of this file used `chmod 0666` to make the file readable "by whoever runs
+    # it", and the broker rejected it at boot with:
+    #
+    #     Cookie file /var/lib/rabbitmq/.erlang.cookie must be accessible by
+    #     owner only
+    #
+    # World-readable is exactly what it forbids. Since the process already runs
+    # as root (user: "0:0" above), owner-only is not a problem: root reads
+    # anything it owns. The permission is corrected rather than loosened.
+    #
+    # `|| true` because the entrypoint creates the cookie only on a volume's
+    # first boot; on every later start the file already exists, and a chmod that
+    # fails must not stop the broker from starting.
     user: "0:0"
-    command: ["bash", "-c", "chmod 0666 /var/lib/rabbitmq/.erlang.cookie; exec /opt/rabbitmq/sbin/rabbitmq-server"]
+    command: ["bash", "-c", "chmod 0400 /var/lib/rabbitmq/.erlang.cookie 2>/dev/null || true; exec /opt/rabbitmq/sbin/rabbitmq-server"]
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest

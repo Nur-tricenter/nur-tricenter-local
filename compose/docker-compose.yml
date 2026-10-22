@@ -3,168 +3,81 @@
 name: nur-tricenter
 
 # =============================================================================
-#  Nur-Tricenter platform: shared infra + the microservice processes that
-#  run on it.
+#  Nur-Tricenter platform: shared infra + every microservice process that runs on it.
 #
-#  Includes docker-compose.infra.yml (Postgres + RabbitMQ + Consul) plus
-#  the three business processes of the catalog microservice:
+#  Three files compose this stack, all through `include:` — never a copy:
 #
-#    catalog-api          Catalog.WebApi        net10.0  (microservice: catalog)
-#    catalog-workerservice Catalog.WorkerService net10.0 (microservice: catalog)
-#    apigateway-webapp    ApiGateway.App     net10.0  (platform, fronts catalog)
+#    docker-compose.infra.yml          Postgres + RabbitMQ + Consul (the platform)
+#    ../../ms2-plans-and-recipes-catalog/catalog.compose.yml   the catalog's 2 processes
+#    ../../nur-tricenter-identity/identity.compose.yml          identity's 2 processes
+#
+#  Plus the gateway, declared inline below, because it belongs to the platform
+#  rather than to any one microservice:
+#
+#    gateway             ApiGateway.App    net10.0  (platform, fronts every service)
+#
+#  ---------------------------------------------------------------------------
+#  WHY INCLUDE AND NOT COPY
+#  ---------------------------------------------------------------------------
+#  The catalog's services used to live HERE, pasted into this file, while the catalog
+#  repository also had its own compose for running alone. That worked, and it was a
+#  trap: two places to change one service. Editing the catalog's variables left this
+#  file silently stale, and nothing failed — the platform just kept running the old
+#  configuration.
+#
+#  `include:` removes the second copy. Each microservice owns its platform-variant
+#  compose file, and this file names where to find them. A change lands in one place.
+#
+#  Each microservice repository ALSO has a standalone compose (docker-compose.yml in
+#  the catalog, the same in identity) with its own Postgres and its own network, for
+#  running that service alone. Those files are NOT included here.
 #
 #  Naming convention
 #  -----------------
-#    Every container is nur-tricenter-<what-it-is>: the prefix says the
-#    platform, the suffix says the role. Nothing repeats the repository
-#    name, because a container outlives the repository it was built
-#    from and a 60-character name costs more than it explains.
+#    Every platform container is nur-tricenter-<what-it-is>: the prefix says the
+#    platform, the suffix says the role. A container outlives the repository it was
+#    built from, and a 60-character name costs more than it explains.
 #
 #      nur-tricenter-postgres           platform, shared
 #      nur-tricenter-rabbitmq           platform, shared
 #      nur-tricenter-consul             platform, shared
 #      nur-tricenter-catalog-api        one microservice, its HTTP entry
 #      nur-tricenter-catalog-workerservice   the same microservice, its worker
+#      nur-tricenter-identity-api       one microservice, its HTTP entry
+#      nur-tricenter-identity-workerservice  the same microservice, its worker
 #      nur-tricenter-gateway            platform, the single public entry point
 #
 #    The compose SERVICE name and the container name are the same word.
-#    They used to differ (apigateway-webapp vs the container), and that is
-#    what makes `docker compose ps` disagree with `docker ps` and forces a
-#    lookup to work out which is which. One name, both places.
+#    They used to differ (apigateway-webapp vs the container), and that is what makes
+#    `docker compose ps` disagree with `docker ps` and forces a lookup to work out
+#    which is which. One name, both places.
 #
-#    `hostname` drops the prefix entirely — catalog-api, catalog-workerservice,
-#    gateway — because that is what the other containers resolve through
-#    Docker DNS, and it only has to be unique inside this network.
+#    `hostname` drops the prefix entirely — catalog-api, identity-api, gateway —
+#    because that is what the other containers resolve through Docker DNS, and it
+#    only has to be unique inside this network.
 #
-#  The compose PROJECT name (top-level `name:`) is what Docker Desktop
-#  groups containers under. Keep it short and stable: it is the label every
-#  container carries in the UI, and renaming it orphans the containers that
-#  were created under the old one.
+#  The compose PROJECT name (top-level `name:`) is what Docker Desktop groups
+#  containers under. Keep it short and stable: it is the label every container
+#  carries in the UI, and renaming it orphans the containers created under the old one.
 #
-#  All three business processes connect to the platform containers by
-#  their container names, which resolve on the shared nur-tricenter-net
-#  network. The database inside Postgres is ms2-plans-and-recipes-catalog
-#  (one database per microservice, named after the microservice, created
-#  by the init.sql in postgres-init/).
+#  All business processes connect to the platform containers by their container names,
+#  which resolve on the shared nur-tricenter-net network. Each microservice owns ONE
+#  database inside that Postgres, created by the init.sql in postgres-init/.
 # =============================================================================
 
 include:
   - path: docker-compose.infra.yml
 
+  # The catalog's two business processes, attached to the SHARED platform network
+  # and infrastructure. NOT the catalog repository's own docker-compose.yml, which is
+  # a standalone stack with its own Postgres and network.
+  - path: ../../ms2-plans-and-recipes-catalog/catalog.compose.yml
+
+  # Identity's two business processes, same arrangement. NOT the identity
+  # repository's own docker-compose.yml, which is standalone.
+  - path: ../../nur-tricenter-identity/identity.compose.yml
+
 services:
-  catalog-api:
-    image: mcr.microsoft.com/dotnet/aspnet:8.0
-    container_name: nur-tricenter-catalog-api
-    hostname: catalog-api
-    working_dir: /app
-    command: ["dotnet", "Catalog.App.dll"]
-    volumes:
-      - ../../ms2-plans-and-recipes-catalog/src/Catalog.App/bin/Debug/net8.0:/app:ro
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:8080
-      # Swagger stays off by default: the gateway has no documentation UI, so nothing in the
-      # stack consumes this document. To expose the catalog's OpenAPI on the workstation for
-      # local exploration, start the stack with the dev profile (start-stack-dev.ps1), which
-      # layers docker-compose.dev.yml on top and turns on Swagger__Enabled plus a host port
-      # mapping for it.
-      # Connect to the platform Postgres, but the catalog's own database,
-      # not the default `postgres` one. Created by the init.sql that
-      # mounts at /docker-entrypoint-initdb.d inside the postgres container.
-      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
-      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
-      RabbitMqSettings__UserName: "guest"
-      RabbitMqSettings__Password: "guest"
-      RabbitMqSettings__VirtualHost: "/"
-      RabbitMqSettings__MaxRetryAttempts: "3"
-      RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
-      # Seed the sample catalogue (30 foods / 25 recipes / 2 plans) on startup so the seed
-      # events land in the transactional outbox, are drained by the catalog worker, and reach
-      # the broker's fanout exchanges (meal-plan-published, food-published, recipe-published,
-      # recipe-updated, food-nutritional-info-updated). The topology that fans those out to
-      # ms1/ms3/ms4/ms5 is declared by rabbitmq-definitions.json at broker boot.
-      Seed__Enabled: "true"
-      ServiceRegistration__ServiceDiscoveryAddress: "http://nur-tricenter-consul:8500"
-      # Pin the host and port the catalog advertises to Consul. Without
-      # these the catalog's IServerPortResolver picks whatever Kestrel
-      # bound to, which during hosted-service startup is usually a dynamic
-      # port and makes the registration inconsistent with the gateway's
-      # expectations.
-      ServiceRegistration__Host: "catalog-api"
-      ServiceRegistration__Port: "8080"
-      ServiceRegistration__ServiceName: "catalog"
-      # This is local-dev compose: the catalog's own appsettings.Development.template.json
-      # sets Migrations__ApplyOnStartup=true exactly for this case. The default in
-      # appsettings.json is false because "a web process is a mediocre place to run DDL",
-      # but here the catalog-api container IS the local dev environment, so letting it
-      # migrate on boot removes the need to hand-run the migration before docker compose up.
-      Migrations__ApplyOnStartup: "true"
-    networks: [nur-tricenter-net]
-    depends_on:
-      db:
-        condition: service_healthy
-      consul:
-        condition: service_started
-    healthcheck:
-      # A shell TCP probe, not curl. The aspnet runtime image ships no curl, so a healthcheck that
-      # calls it fails with "curl: not found" forever and the container is reported unhealthy
-      # while the application is perfectly fine. /dev/tcp is part of bash, which is present.
-      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
-
-  catalog-workerservice:
-    image: mcr.microsoft.com/dotnet/aspnet:8.0
-    container_name: nur-tricenter-catalog-workerservice
-    hostname: catalog-workerservice
-    working_dir: /app
-    command: ["dotnet", "Catalog.WorkerService.dll"]
-    volumes:
-      - ../../ms2-plans-and-recipes-catalog/src/Catalog.WorkerService/bin/Debug/net8.0:/app:ro
-    environment:
-      DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__CatalogDbConnectionString: "Host=nur-tricenter-postgres;Port=5432;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password"
-      RabbitMqSettings__Host: "nur-tricenter-rabbitmq"
-      RabbitMqSettings__UserName: "guest"
-      RabbitMqSettings__Password: "guest"
-      RabbitMqSettings__VirtualHost: "/"
-      RabbitMqSettings__MaxRetryAttempts: "3"
-      RabbitMqSettings__RetryBaseDelayMilliseconds: "500"
-    networks: [nur-tricenter-net]
-    depends_on:
-      db:
-        condition: service_healthy
-      rabbitmq:
-        # service_healthy, not service_started: the outbox processor connects to the broker as
-        # soon as it starts, and a broker that is still booting turns the first publish attempt
-        # into an exception on every poll until it settles.
-        condition: service_healthy
-    # This process is NOT registered in Consul, and that is deliberate.
-    #
-    # Consul registration exists so the gateway can route traffic to a service. The worker
-    # publishes to RabbitMQ and serves no HTTP at all: it has no listener, no controller and no
-    # address to register. Registering it would publish a route to an endpoint that cannot
-    # answer, and the gateway would happily proxy into a black hole.
-    #
-    # Its liveness is a container concern, not a routing concern, so it belongs in a Docker
-    # healthcheck. The process is a long-running OutboxProcessor: if it exits, the outbox stops
-    # being drained and no event is ever projected. That is exactly what a restart policy is for,
-    # and it is what this check reports.
-    healthcheck:
-      # `/proc/<pid>/cmdline` rather than `pgrep`: the aspnet runtime image ships no procps, so
-      # `pgrep: not found` fails the check forever while the worker is running perfectly. Reading
-      # the kernel's own view of the process needs no extra tool. There is no port to probe
-      # either — this host has no listener.
-      test: ["CMD-SHELL", "grep -qs 'Catalog.WorkerService' /proc/*/cmdline || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    restart: unless-stopped
-
   gateway:
     # The runtime tag follows THIS project's TargetFramework (net10.0): the gateway
     # does not consume the shared kernels, so it was never part of the move to net8.0.

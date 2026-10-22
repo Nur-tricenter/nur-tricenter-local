@@ -32,3 +32,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms2-plans-and-recipes
 -- Add a new microservice by adding another block here, e.g.:
 --   SELECT 'CREATE DATABASE ms2-plans-inventory'
 --   WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms2-plans-inventory')\gexec
+
+-- Identity. Named after the microservice, like every other line in this file.
+--
+-- The tables land in the `public` schema and the transactional outbox in `outbox`,
+-- matching what IdentityDbContext maps.
+SELECT 'CREATE DATABASE nur_tricenter_identity'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_identity')\gexec
