@@ -291,3 +291,112 @@ environment-variable names.
 
 - `ANALISIS-ARQUITECTURA-MS2026.md` (in the workspace root) — the architecture analysis this stack implements.
 - `nur-tricenter-shared-kernels` — the platform libraries, consumed as NuGet packages.
+
+## Integration & extending the platform
+
+The orchestrator brings the **whole platform** up in Docker for local development: shared infrastructure
+(Postgres, RabbitMQ, Consul) plus every business process that subscribes to a profile. It is local-dev
+only; in production each service ships on its own.
+
+### What is here
+
+```
+nur-tricenter-orchestrator/
+├── compose/                  # stack definition, split by responsibility
+│   ├── docker-compose.yml    # root compose (include: infra + business processes)
+│   ├── docker-compose.infra.yml
+│   └── dev/docker-compose.dev.yml   # dev profile (catalog Swagger + host port 18080)
+├── topology/                 # broker + database stay the same on every boot
+│   ├── rabbitmq.conf
+│   ├── rabbitmq-definitions.json   # exchanges / queues / bindings
+│   └── postgres-init/01-create-databases.sql
+└── scripts/                  # entry points
+    ├── start-stack.{sh,ps1}        # base flow (Swagger OFF)
+    ├── start-stack-dev.{sh,ps1}    # base + dev profile
+    ├── start-infrastructure.{sh,ps1}
+    └── stop-infrastructure.{sh,ps1}
+```
+
+### Prerequisites
+
+- Docker Desktop running.
+- .NET SDK 8 and 10 (catalog/identity target `net8.0`, gateway `net10.0`).
+- The four sibling repositories next to this one (cloned by `setup-project`).
+- `NUGET_USERNAME` / `NUGET_TOKEN` env vars (read:packages) for the private kernel feed.
+
+### First-time setup
+
+```bash
+./scripts/setup-project.sh        # or .ps1 on Windows (idempotent)
+```
+
+Clones the sibling repos if missing. Reports whether `NUGET_TOKEN` is defined.
+
+### Starting the stack
+
+```bash
+./scripts/start-stack.sh          # base (Swagger off, no extra host ports)
+./scripts/start-stack-dev.sh     # base + catalog Swagger on :18080
+```
+
+Each script: removes stale containers (keeps volumes), resolves absolute paths, creates the
+`nur-tricenter-net` network, builds the three business projects (`dotnet build`), brings up infra +
+processes, applies the catalog schema (`--migrate`).
+
+### Profiles (adding a microservice requires no edit here)
+
+| Profile | What it starts |
+|---|---|
+| *(none)* | Infra only: Postgres, RabbitMQ, Consul |
+| `catalog` | catalog-api + catalog-workerservice |
+| `gateway` | apigateway-webapp |
+
+```bash
+docker compose up                                    # infra only
+docker compose --profile catalog up                  # catalog + infra
+docker compose --profile catalog --profile gateway up # both
+```
+
+### How to add a new microservice
+
+On the **service's** side (its own repo, its own PR):
+1. A compose file declaring `profiles: [<service-name>]`.
+2. A `CREATE DATABASE <service>` block in the orchestrator's `postgres-init/01-create-databases.sql`.
+3. Consul self-registration via `ServiceRegistration__ServiceName`.
+4. Its own RabbitMQ exchanges/queues in `rabbitmq-definitions.json` if it publishes/consumes.
+
+On the **orchestrator's** side: **nothing**. A profile is opt-in, so a service that declares no profile
+appears in no `up`. This is what keeps teams from conflicting on the platform repo.
+
+### Topology (container names)
+
+| Container | Hostname (DNS) | Ports |
+|---|---|---|
+| nur-tricenter-postgres | nur-tricenter-postgres | host 5433 → 5432 |
+| nur-tricenter-rabbitmq | nur-tricenter-rabbitmq | 5672, 15672 |
+| nur-tricenter-consul | nur-tricenter-consul | 8500 |
+| nur-tricenter-catalog-api | catalog-api | 8080 (host 18080 only in dev) |
+| nur-tricenter-catalog-workerservice | catalog-workerservice | 8080 |
+| nur-tricenter-identity-api | identity-api | 8080 |
+| nur-tricenter-identity-workerservice | identity-workerservice | 8080 |
+| nur-tricenter-gateway | gateway | host 15005 → 8080 |
+
+### Verify
+
+```bash
+curl http://localhost:15005/health
+curl http://localhost:15005/api/catalog/v1/foods
+open http://localhost:8500   # Consul
+open http://localhost:15672  # RabbitMQ (guest/guest)
+```
+
+### Notes
+
+- All business processes are **bind-mounted** from their own repo's `bin/Debug` output. A stale build
+  directory is the most common cause of a container that starts and immediately crashes on a missing
+  assembly — rebuild the project before restarting.
+- The gateway is the only service always mapped to a host port (sole public entry point). The catalog's
+  `18080 → 8080` is dev-only.
+- Compose is the source of truth (Aspire AppHost was removed: Aspire 13.6.1 conflicts with the docker
+  network namespace on a host that already has containers).
+- `ANALISIS-ARQUITECTURA-MS2026.md` (workspace root) is the architecture analysis this stack implements.
