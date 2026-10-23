@@ -395,6 +395,9 @@ open http://localhost:15672  # RabbitMQ (guest/guest)
 - All business processes are **bind-mounted** from their own repo's `bin/Debug` output. A stale build
   directory is the most common cause of a container that starts and immediately crashes on a missing
   assembly — rebuild the project before restarting.
+- `start-stack` builds catalog (App + Worker) and the gateway. Identity is **not** built by the script:
+  run `dotnet build` in `nur-tricenter-identity/src/Identity.App` and `.../Identity.WorkerService`
+  before starting, otherwise the bind-mounted `bin/Debug` is empty and the container crashes.
 - The gateway is the only service always mapped to a host port (sole public entry point). The catalog's
   `18080 → 8080` is dev-only.
 - Compose is the source of truth (Aspire AppHost was removed: Aspire 13.6.1 conflicts with the docker
