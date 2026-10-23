@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <AspireUseCliBundle>true</AspireUseCliBundle>
     <UserSecretsId>185da2bd-3cdf-42c8-a772-a5d9f814a8ad</UserSecretsId>
+    <NoWarn>NU1902</NoWarn>
   </PropertyGroup>
 
   <!--
