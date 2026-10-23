@@ -37,6 +37,7 @@ $composeFile       = Join-Path $composeDir 'docker-compose.yml'
 $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
+$identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
 
 # 0. Make sure no stale containers are squatting the names we need. Same
 # pattern as start-infrastructure.ps1: rm first, then up. The named
@@ -67,20 +68,27 @@ if (-not $existingNet) {
     docker network create $netName | Out-Null
 }
 
-# 1. Build the three business projects on the host. The compose file
-# bind-mounts the output bin/Debug/ directories.
-Write-Host "Building catalog and gateway ..."
+# 1. Build the business projects on the host. The compose file
+# bind-mounts the output bin/Debug/ directories. Identity is included here
+# (it was previously a manual step) so the whole stack comes up from one command.
+Write-Host "Building catalog, identity and gateway ..."
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj')              -c Debug | Out-Null
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj')            -c Debug | Out-Null
+& dotnet build (Join-Path $identityRoot 'src\Identity.WorkerService\Identity.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj')            -c Debug | Out-Null
 
-# 2. Bring up infra + 3 business processes in one shot.
-# Pin the project name explicitly: the compose file declares it, but
-# passing it on the CLI guards against the warning "volume was created
-# for project X, expected nur-tricenter" when the working directory is
-# named something else.
+# 2. Bring up infra + business processes in one shot. docker compose writes
+# informational lines to stderr, which with $ErrorActionPreference='Stop' would
+# abort the script even on a successful up. Run it with the preference relaxed
+# and discard its output; the exit code is what matters.
 Write-Host "Starting infra + business processes via docker compose ..."
-docker compose -f $composeFile -f $composeInfraFile -p nur-tricenter up -d
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+docker compose -f $composeFile -f $composeInfraFile -p nur-tricenter up -d 2>&1 | Out-Null
+$composeExit = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorAction
+if ($composeExit -ne 0) { throw "docker compose up failed with exit code $composeExit" }
 
 # 3. Apply the schema. The migration runs on the host against the
 # platform postgres's catalog database. Inside docker, the database is
@@ -96,6 +104,13 @@ docker compose -f $composeFile -f $composeInfraFile -p nur-tricenter up -d
 $conn = 'Host=localhost;Port=5433;Database=ms2-plans-and-recipes-catalog;Username=dev-only;Password=dev-only-password'
 $env:ConnectionStrings__CatalogDbConnectionString = $conn
 $env:ASPNETCORE_ENVIRONMENT                     = 'Development'
+# The catalog Startup calls AddSecurity, which refuses to compose without a
+# signing key. The container supplies it through compose; the host migrate
+# step needs it too.
+$env:Jwt__SecretKey    = 'dev-only-signing-key-not-a-secret-0123456789'
+$env:Jwt__ValidIssuer  = 'nur-tricenter-identity'
+$env:Jwt__ValidAudience = 'nur-tricenter-clients'
+$env:Jwt__Lifetime     = '3600'
 
 $migrateDll = Get-ChildItem -Path (Join-Path $catalogRoot 'src\Catalog.App\bin\Debug\net8.0\Catalog.App.dll') | Select-Object -First 1
 Write-Host "Applying catalog schema ..."
