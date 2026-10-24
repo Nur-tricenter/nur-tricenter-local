@@ -187,6 +187,17 @@
                           "arguments":  {
 
                                         }
+                      },
+                      {
+                          "name":  "package-validated",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
                       }
                   ],
     "queues":  [
@@ -453,6 +464,15 @@
                    },
                    {
                        "name":  "ms2.user-updated",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms5.package-validated",
                        "vhost":  "/",
                        "durable":  true,
                        "auto_delete":  false,
@@ -756,6 +776,16 @@
                          "source":  "user-updated",
                          "vhost":  "/",
                          "destination":  "ms2.user-updated",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "package-validated",
+                         "vhost":  "/",
+                         "destination":  "ms5.package-validated",
                          "destination_type":  "queue",
                          "routing_key":  "",
                          "arguments":  {

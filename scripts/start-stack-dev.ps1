@@ -41,6 +41,7 @@ $composeInfraFile  = Join-Path $composeDir  'docker-compose.infra.yml'
 $composeDevFile    = Join-Path $devComposeDir 'docker-compose.dev.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
+$ms3Root           = Join-Path $repoRoot '..\ms3-contract-and-production'
 
 # ---- 0. Stale containers ----
 # (Same intent as start-stack.ps1: any container squatting the names we want
@@ -48,6 +49,7 @@ $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $expected = @(
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
+    'nur-tricenter-contracting-api','nur-tricenter-contracting-workerservice',
     'nur-tricenter-gateway'
 )
 foreach ($name in $expected) {
@@ -75,6 +77,8 @@ Write-Host "Building catalog and gateway ..."
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj')              -c Debug | Out-Null
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj')            -c Debug | Out-Null
+& dotnet build (Join-Path $ms3Root 'Nurtricenter.Api\Nurtricenter.MS3.Api.csproj')                         -c Debug | Out-Null
+& dotnet build (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj') -c Debug | Out-Null
 
 # ---- 2. Infra + business processes ----
 # THIS is the line that deviates from the base script: layer the dev profile

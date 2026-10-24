@@ -44,3 +44,8 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_identit
 -- MS4 (delivery calendar). Underscored: a hyphenated name would need quoting in CREATE DATABASE.
 SELECT 'CREATE DATABASE ms4_delivery_calendar'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms4_delivery_calendar')\gexec
+
+-- MS3 (contracting and production). The API also creates it on its first migration when the
+-- volume predates this line.
+SELECT 'CREATE DATABASE nur_tricenter_contracting'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_contracting')\gexec

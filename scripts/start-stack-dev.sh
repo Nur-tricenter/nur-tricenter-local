@@ -33,11 +33,13 @@ COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
 COMPOSE_DEV_FILE="$DEV_COMPOSE_DIR/docker-compose.dev.yml"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
+MS3_ROOT="$REPO_ROOT/../ms3-contract-and-production"
 
 # 0. Make sure no stale containers are squatting the names we need.
 EXPECTED=(
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
     nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
+    nur-tricenter-contracting-api nur-tricenter-contracting-workerservice
     nur-tricenter-gateway
 )
 for name in "${EXPECTED[@]}"; do
@@ -57,6 +59,8 @@ echo "Building catalog and gateway ..."
 dotnet build "$CATALOG_ROOT/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$GATEWAY_ROOT/ApiGateway.App/ApiGateway.App.csproj" -c Debug >/dev/null
+dotnet build "$MS3_ROOT/Nurtricenter.Api/Nurtricenter.MS3.Api.csproj" -c Debug >/dev/null
+dotnet build "$MS3_ROOT/Nurtricenter.MS3.WorkerService/Nurtricenter.MS3.WorkerService.csproj" -c Debug >/dev/null
 
 # 2. Bring up infra + business processes, with the dev profile layered on top.
 # THIS is the line that differs from start-stack.sh: the third -f picks up

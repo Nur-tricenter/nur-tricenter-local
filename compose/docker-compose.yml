@@ -86,6 +86,10 @@ include:
   # under another folder name sets NURTRICENTER_REPO_DIR instead.
   - path: ../../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-delivery}/nurtricenter.compose.yml
 
+  # MS3 (contracting and production): API + outbox/consumer worker, same arrangement. Repository
+  # ms3-contract-and-production, cloned as a sibling like the others.
+  - path: ../../ms3-contract-and-production/contracting.compose.yml
+
 services:
   gateway:
     # The runtime tag follows THIS project's TargetFramework (net10.0): the gateway

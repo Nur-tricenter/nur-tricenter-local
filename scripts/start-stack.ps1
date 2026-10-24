@@ -39,6 +39,7 @@ $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
 $ms4Root           = Join-Path $repoRoot '..\ms4-delivery-schedule-management'
+$ms3Root           = Join-Path $repoRoot '..\ms3-contract-and-production'
 # ms5's folder name differs between clones; the compose include reads the same variable.
 $nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'ms5-logistics-and-delivery' }
 $nurtricenterRoot  = Join-Path $repoRoot "..\$nurtricenterDir"
@@ -54,6 +55,7 @@ $expected = @(
     'nur-tricenter-identity-migrate','nur-tricenter-identity-api','nur-tricenter-identity-workerservice',
     'nur-tricenter-delivery-calendar-migrate','nur-tricenter-delivery-calendar-api','nur-tricenter-delivery-calendar-workerservice',
     'nur-tricenter-nurtricenter-api','nur-tricenter-nurtricenter-workerservice',
+    'nur-tricenter-contracting-api','nur-tricenter-contracting-workerservice',
     # Platform: gateway (container_name declared in docker-compose.yml)
     'nur-tricenter-gateway'
 )
@@ -91,6 +93,8 @@ Write-Host "Building catalog, identity, delivery calendar (ms4) and gateway ..."
 if ($LASTEXITCODE -ne 0) { throw "MS4 API build failed" }
 & dotnet build (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj')               -c Debug | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "MS4 worker build failed" }
+& dotnet build (Join-Path $ms3Root 'Nurtricenter.Api\Nurtricenter.MS3.Api.csproj')                         -c Debug | Out-Null
+& dotnet build (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj') -c Debug | Out-Null
 
 # 2. Bring up infra + business processes in one shot. docker compose writes
 # informational lines to stderr, which with $ErrorActionPreference='Stop' would
@@ -161,6 +165,26 @@ try {
 } catch {
     if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 409) {
         Write-Host "MS4 service account 'ms4-service' already exists."
+    } else {
+        throw
+    }
+}
+# MS3's service account: MS3 calls MS4 to create the delivery calendar after a payment
+# (deliveryCalendar.calendar:create) and to read tomorrow's production order
+# (deliveryCalendar.productionOrder:read). Same idempotent creation as MS4's.
+$ms3ServiceAccount = @{
+    userName = 'ms3-service'
+    email    = 'ms3-service@nur.local'
+    password = 'dev-only-ms3-service-password'
+    scopes   = @('deliveryCalendar.calendar:create', 'deliveryCalendar.productionOrder:read')
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Method Post -Uri "$gateway/api/identity-service/v1/users" `
+        -Headers @{ Authorization = "Bearer $adminToken" } -ContentType 'application/json' -Body $ms3ServiceAccount | Out-Null
+    Write-Host "Created MS3 service account 'ms3-service'."
+} catch {
+    if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 409) {
+        Write-Host "MS3 service account 'ms3-service' already exists."
     } else {
         throw
     }

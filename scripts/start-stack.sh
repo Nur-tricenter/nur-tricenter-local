@@ -24,6 +24,7 @@ CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
 MS4_ROOT="$REPO_ROOT/../ms4-delivery-schedule-management"
+MS3_ROOT="$REPO_ROOT/../ms3-contract-and-production"
 # ms5's folder name differs between clones; the compose include reads the same variable.
 NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-delivery}"
 
@@ -34,6 +35,7 @@ EXPECTED=(
     nur-tricenter-identity-migrate nur-tricenter-identity-api nur-tricenter-identity-workerservice
     nur-tricenter-delivery-calendar-migrate nur-tricenter-delivery-calendar-api nur-tricenter-delivery-calendar-workerservice
     nur-tricenter-nurtricenter-api nur-tricenter-nurtricenter-workerservice
+    nur-tricenter-contracting-api nur-tricenter-contracting-workerservice
     nur-tricenter-gateway
 )
 for name in "${EXPECTED[@]}"; do
@@ -63,6 +65,8 @@ dotnet build "$GATEWAY_ROOT/ApiGateway.App/ApiGateway.App.csproj" -c Debug >/dev
 # MS4 builds into its own artifacts/ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
 dotnet build "$MS4_ROOT/src/Api/Api.csproj" -c Debug >/dev/null
 dotnet build "$MS4_ROOT/src/WorkerService/WorkerService.csproj" -c Debug >/dev/null
+dotnet build "$MS3_ROOT/Nurtricenter.Api/Nurtricenter.MS3.Api.csproj" -c Debug >/dev/null
+dotnet build "$MS3_ROOT/Nurtricenter.MS3.WorkerService/Nurtricenter.MS3.WorkerService.csproj" -c Debug >/dev/null
 
 # 2. Bring up infra + business processes in one shot.
 echo "Starting infra + business processes via docker compose ..."
@@ -105,6 +109,18 @@ case "$STATUS" in
     2*)  echo "Created MS4 service account 'ms4-service'." ;;
     409) echo "MS4 service account 'ms4-service' already exists." ;;
     *)   echo "Creating MS4's service account failed with HTTP $STATUS" >&2; exit 1 ;;
+esac
+
+# MS3's service account: MS3 calls MS4 to create the delivery calendar after a payment
+# (deliveryCalendar.calendar:create) and to read tomorrow's production order
+# (deliveryCalendar.productionOrder:read). Same idempotent creation as MS4's.
+STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$GATEWAY/api/identity-service/v1/users" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+    -d '{"userName":"ms3-service","email":"ms3-service@nur.local","password":"dev-only-ms3-service-password","scopes":["deliveryCalendar.calendar:create","deliveryCalendar.productionOrder:read"]}')"
+case "$STATUS" in
+    2*)  echo "Created MS3 service account 'ms3-service'." ;;
+    409) echo "MS3 service account 'ms3-service' already exists." ;;
+    *)   echo "Creating MS3's service account failed with HTTP $STATUS" >&2; exit 1 ;;
 esac
 
 cat <<EOF
