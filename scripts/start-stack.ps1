@@ -38,6 +38,7 @@ $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
+$ms4Root           = Join-Path $repoRoot '..\delivery-schedule-management'
 # ms5's folder name differs between clones; the compose include reads the same variable.
 $nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'nurtricenter-logistics-and-delivery' }
 $nurtricenterRoot  = Join-Path $repoRoot "..\$nurtricenterDir"
@@ -50,6 +51,8 @@ $expected = @(
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     # Microservice processes (container_name declared in docker-compose.yml)
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
+    'nur-tricenter-identity-migrate','nur-tricenter-identity-api','nur-tricenter-identity-workerservice',
+    'nur-tricenter-delivery-calendar-migrate','nur-tricenter-delivery-calendar-api','nur-tricenter-delivery-calendar-workerservice',
     'nur-tricenter-nurtricenter-api','nur-tricenter-nurtricenter-workerservice',
     # Platform: gateway (container_name declared in docker-compose.yml)
     'nur-tricenter-gateway'
@@ -75,7 +78,7 @@ if (-not $existingNet) {
 # 1. Build the business projects on the host. The compose file
 # bind-mounts the output bin/Debug/ directories. Identity is included here
 # (it was previously a manual step) so the whole stack comes up from one command.
-Write-Host "Building catalog, identity and gateway ..."
+Write-Host "Building catalog, identity, delivery calendar (ms4) and gateway ..."
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj')              -c Debug | Out-Null
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj')            -c Debug | Out-Null
@@ -83,6 +86,11 @@ Write-Host "Building catalog, identity and gateway ..."
 & dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.Api\Nurtricenter.Api.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.WorkerService\Nurtricenter.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj')            -c Debug | Out-Null
+# MS4 builds into its own artifacts\ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
+& dotnet build (Join-Path $ms4Root 'src\Api\Api.csproj')                                   -c Debug | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "MS4 API build failed" }
+& dotnet build (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj')               -c Debug | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "MS4 worker build failed" }
 
 # 2. Bring up infra + business processes in one shot. docker compose writes
 # informational lines to stderr, which with $ErrorActionPreference='Stop' would
@@ -123,12 +131,48 @@ Write-Host "Applying catalog schema ..."
 & dotnet (Join-Path $migrateDll.DirectoryName 'Catalog.App.dll') --migrate
 if ($LASTEXITCODE -ne 0) { throw "Catalog schema migration failed" }
 
+# 4. MS4's service account. MS4 reads meal plans from the catalog (catalog.mealPlan:read) as a
+# service account, not as the administrator. Identity seeds no such account, so it is created
+# here through the gateway with the seeded admin's token. Idempotent: 409 means it exists.
+# The gateway learns identity's route from Consul within ~30s, hence the retry loop.
+$gateway = 'http://localhost:15005'
+$adminToken = $null
+for ($attempt = 1; $attempt -le 24 -and -not $adminToken; $attempt++) {
+    try {
+        $login = Invoke-RestMethod -Method Post -Uri "$gateway/api/identity-service/v1/auth/login" `
+            -ContentType 'application/json' -Body '{"userName":"admin","password":"admin"}'
+        $adminToken = $login.accessToken
+    } catch {
+        Start-Sleep -Seconds 5
+    }
+}
+if (-not $adminToken) { throw "Could not log in to identity through the gateway to create MS4's service account" }
+
+$serviceAccount = @{
+    userName = 'ms4-service'
+    email    = 'ms4-service@nur.local'
+    password = 'dev-only-ms4-service-password'
+    scopes   = @('catalog.mealPlan:read')
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Method Post -Uri "$gateway/api/identity-service/v1/users" `
+        -Headers @{ Authorization = "Bearer $adminToken" } -ContentType 'application/json' -Body $serviceAccount | Out-Null
+    Write-Host "Created MS4 service account 'ms4-service'."
+} catch {
+    if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 409) {
+        Write-Host "MS4 service account 'ms4-service' already exists."
+    } else {
+        throw
+    }
+}
+
 Write-Host ""
 Write-Host "Stack ready."
 Write-Host "  - Consul UI:    http://localhost:8500"
 Write-Host "  - RabbitMQ UI:  http://localhost:15672  (guest / guest)"
 Write-Host "  - Gateway:      http://localhost:15005"
 Write-Host "  - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)"
+Write-Host "  - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)"
 Write-Host "  - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)"
 Write-Host "    (uses its own Neon database: ConnectionStrings__DefaultConnection in $nurtricenterRoot\.env)"
 Write-Host ""
