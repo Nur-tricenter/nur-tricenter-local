@@ -35,6 +35,7 @@ $repoRoot          = Split-Path -Parent $scriptDir           # the orchestrator 
 $composeDir        = Join-Path $repoRoot 'compose'
 $composeFile       = Join-Path $composeDir 'docker-compose.yml'
 $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
+$ms1Root           = Join-Path $repoRoot '..\ms1-clinica-nutricional'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
@@ -51,6 +52,7 @@ $expected = @(
     # Platform
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     # Microservice processes (container_name declared in docker-compose.yml)
+    'nur-tricenter-clinica-nutricional-api','nur-tricenter-clinica-nutricional-workerservice',
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
     'nur-tricenter-identity-migrate','nur-tricenter-identity-api','nur-tricenter-identity-workerservice',
     'nur-tricenter-delivery-calendar-migrate','nur-tricenter-delivery-calendar-api','nur-tricenter-delivery-calendar-workerservice',
@@ -80,7 +82,9 @@ if (-not $existingNet) {
 # 1. Build the business projects on the host. The compose file
 # bind-mounts the output bin/Debug/ directories. Identity is included here
 # (it was previously a manual step) so the whole stack comes up from one command.
-Write-Host "Building catalog, identity, delivery calendar (ms4) and gateway ..."
+Write-Host "Building clinica nutricional, catalog, identity, delivery calendar (ms4) and gateway ..."
+& dotnet build (Join-Path $ms1Root 'src\ClinicaNutricional.Api\ClinicaNutricional.Api.csproj')              -c Debug | Out-Null
+& dotnet build (Join-Path $ms1Root 'src\ClinicaNutricional.WorkerService\ClinicaNutricional.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj')              -c Debug | Out-Null
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj')            -c Debug | Out-Null

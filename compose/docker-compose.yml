@@ -73,9 +73,9 @@ include:
   # a standalone stack with its own Postgres and network.
   - path: ../../ms2-plans-and-recipes-catalog/catalog.compose.yml
 
-  # Identity's two business processes, same arrangement. NOT the identity
-  # repository's own docker-compose.yml, which is standalone.
-  - path: ../../nur-tricenter-identity/identity.compose.yml
+  # ms1 (Clinica Nutricional): API + Worker, same arrangement.
+  - path: ../../ms1-clinica-nutricional/ms1.compose.yml
+
 
   # MS4 (delivery calendar): API + migrate job + RabbitMQ worker, same arrangement. Repository
   # ms4-delivery-schedule-management, cloned as a sibling like the two above.

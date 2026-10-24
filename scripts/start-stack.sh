@@ -20,6 +20,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_DIR="$REPO_ROOT/compose"
 COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
+MS1_ROOT="$REPO_ROOT/../ms1-clinica-nutricional"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
@@ -31,6 +32,7 @@ NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-deli
 # 0. Make sure no stale containers are squatting the names we need.
 EXPECTED=(
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
+    nur-tricenter-clinica-nutricional-api nur-tricenter-clinica-nutricional-workerservice
     nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
     nur-tricenter-identity-migrate nur-tricenter-identity-api nur-tricenter-identity-workerservice
     nur-tricenter-delivery-calendar-migrate nur-tricenter-delivery-calendar-api nur-tricenter-delivery-calendar-workerservice
@@ -54,7 +56,9 @@ if ! docker network ls --format '{{.Name}}' | grep -qx 'nur-tricenter-net'; then
 fi
 
 # 1. Build the business projects (their output folders are bind-mounted).
-echo "Building catalog, identity, delivery calendar (ms4) and gateway ..."
+echo "Building clinica nutricional, catalog, identity, delivery calendar (ms4) and gateway ..."
+dotnet build "$MS1_ROOT/src/ClinicaNutricional.Api/ClinicaNutricional.Api.csproj" -c Debug >/dev/null
+dotnet build "$MS1_ROOT/src/ClinicaNutricional.WorkerService/ClinicaNutricional.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$IDENTITY_ROOT/src/Identity.App/Identity.App.csproj" -c Debug >/dev/null
@@ -130,6 +134,7 @@ Stack ready.
   - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
   - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)
+  - Clinica Nutricional API: internal only (reachable through the gateway as /api/clinica-nutricional/v1/...)
   - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)
   - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)
 
