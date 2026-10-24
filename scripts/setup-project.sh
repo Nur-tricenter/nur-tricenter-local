@@ -48,6 +48,7 @@ repositories=(
   "nur-tricenter-shared-kernels|https://github.com/Nur-tricenter/nur-tricenter-shared-kernels.git"
   "ms5-logistics-and-delivery|https://github.com/Nur-tricenter/ms5-logistics-and-delivery.git"
   "ms4-delivery-schedule-management|https://github.com/Nur-tricenter/ms4-delivery-schedule-management.git"
+  "ms3-contract-and-production|https://github.com/Nur-tricenter/ms3-contract-and-production.git"
 )
 
 echo

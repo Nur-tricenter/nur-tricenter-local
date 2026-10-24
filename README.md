@@ -381,6 +381,8 @@ appears in no `up`. This is what keeps teams from conflicting on the platform re
 | nur-tricenter-identity-workerservice | identity-workerservice | 8080 |
 | nur-tricenter-nurtricenter-api | nurtricenter-api | 8080 |
 | nur-tricenter-nurtricenter-workerservice | nurtricenter-workerservice | — (no HTTP) |
+| nur-tricenter-contracting-api | contracting-api | 8080 (host 18083 only in dev) |
+| nur-tricenter-contracting-workerservice | contracting-workerservice | — (no HTTP) |
 | nur-tricenter-gateway | gateway | host 15005 → 8080 |
 
 ### ms5 (logistics and delivery)
@@ -399,6 +401,21 @@ name, set `NURTRICENTER_REPO_DIR` to it, e.g.
   answers only POST (create a courier); there is no list endpoint.
 - Publishes 10 fanout exchanges (`courier-created`, `route-started`, `delivery-failed`, ...),
   declared in `rabbitmq-definitions.json`. Contracts: `Nur.Tricenter.Integration.Messages.Logistics`.
+
+### ms3 (contracting and production)
+
+Repository: [Nur-tricenter/ms3-contract-and-production](https://github.com/Nur-tricenter/ms3-contract-and-production),
+cloned by `setup-project` as `ms3-contract-and-production`. Included from
+`../ms3-contract-and-production/contracting.compose.yml`.
+
+- Uses the platform Postgres, database `nur_tricenter_contracting` (created by `01-create-databases.sql`;
+  the API also creates it on its first migration).
+- Registers in Consul as `contracting`: `curl http://localhost:15005/api/contracting/v1/sim/patients/00000000-0000-0000-0000-000000000001`.
+- Consumes `ms3.meal-plan-published`, `ms3.recipe-published` and `ms3.recipe-updated` (catalog).
+- Calls MS4 through the gateway as service account `ms3-service` (created by `start-stack`):
+  `POST /api/delivery-calendar/v1/schedule` after a payment (from its outbox, idempotent by `contractId`) and
+  `GET /api/delivery-calendar/v1/calendars/active-tomorrow` for the daily production order.
+- Publishes `package-validated` (→ `ms5.package-validated`). Contract: `Nur.Tricenter.Integration.Messages.Contracting`.
 
 ### Verify
 

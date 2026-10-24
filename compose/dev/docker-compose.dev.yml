@@ -32,3 +32,12 @@ services:
     # traffic; this mapping is dev-only convenience.
     ports:
       - "18080:8080"
+
+  contracting-api:
+    # MS3: same idea as the catalog above. Swagger on, and the process reachable from the
+    # workstation at :18083 for reading the contract. Application traffic still goes through
+    # the gateway as /api/contracting/v1/...
+    environment:
+      Swagger__Enabled: "true"
+    ports:
+      - "18083:8080"
