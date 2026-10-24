@@ -23,7 +23,7 @@ COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
-MS4_ROOT="$REPO_ROOT/../delivery-schedule-management"
+MS4_ROOT="$REPO_ROOT/../ms4-delivery-schedule-management"
 # ms5's folder name differs between clones; the compose include reads the same variable.
 NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-nurtricenter-logistics-and-delivery}"
 

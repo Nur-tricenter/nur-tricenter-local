@@ -38,7 +38,7 @@ $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
-$ms4Root           = Join-Path $repoRoot '..\delivery-schedule-management'
+$ms4Root           = Join-Path $repoRoot '..\ms4-delivery-schedule-management'
 # ms5's folder name differs between clones; the compose include reads the same variable.
 $nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'nurtricenter-logistics-and-delivery' }
 $nurtricenterRoot  = Join-Path $repoRoot "..\$nurtricenterDir"

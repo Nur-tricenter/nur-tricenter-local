@@ -78,8 +78,8 @@ include:
   - path: ../../nur-tricenter-identity/identity.compose.yml
 
   # MS4 (delivery calendar): API + migrate job + RabbitMQ worker, same arrangement. Repository
-  # delivery-schedule-management, cloned as a sibling like the two above.
-  - path: ../../delivery-schedule-management/ms4.compose.yml
+  # ms4-delivery-schedule-management, cloned as a sibling like the two above.
+  - path: ../../ms4-delivery-schedule-management/ms4.compose.yml
 
   # ms5 (logistics and delivery): API + outbox worker, same arrangement. The repository
   # folder name differs between clones (the GitHub name vs a course checkout), so it is
