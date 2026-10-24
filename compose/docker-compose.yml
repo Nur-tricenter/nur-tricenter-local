@@ -81,10 +81,10 @@ include:
   # ms4-delivery-schedule-management, cloned as a sibling like the two above.
   - path: ../../ms4-delivery-schedule-management/ms4.compose.yml
 
-  # ms5 (logistics and delivery): API + outbox worker, same arrangement. The repository
-  # folder name differs between clones (the GitHub name vs a course checkout), so it is
-  # read from NURTRICENTER_REPO_DIR, defaulting to the name setup-project clones it as.
-  - path: ../../${NURTRICENTER_REPO_DIR:-nurtricenter-logistics-and-delivery}/nurtricenter.compose.yml
+  # ms5 (logistics and delivery): API + outbox worker, same arrangement. Cloned by
+  # setup-project as ms5-logistics-and-delivery (the Nur-tricenter repository); a checkout
+  # under another folder name sets NURTRICENTER_REPO_DIR instead.
+  - path: ../../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-delivery}/nurtricenter.compose.yml
 
 services:
   gateway:

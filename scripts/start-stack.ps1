@@ -40,7 +40,7 @@ $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
 $ms4Root           = Join-Path $repoRoot '..\ms4-delivery-schedule-management'
 # ms5's folder name differs between clones; the compose include reads the same variable.
-$nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'nurtricenter-logistics-and-delivery' }
+$nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'ms5-logistics-and-delivery' }
 $nurtricenterRoot  = Join-Path $repoRoot "..\$nurtricenterDir"
 
 # 0. Make sure no stale containers are squatting the names we need. Same

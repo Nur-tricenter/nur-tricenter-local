@@ -46,7 +46,7 @@ repositories=(
   "nur-tricenter-identity|https://github.com/Nur-tricenter/nur-tricenter-identity.git"
   "nur-tricenter-api-gateway|https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git"
   "nur-tricenter-shared-kernels|https://github.com/Nur-tricenter/nur-tricenter-shared-kernels.git"
-  "nurtricenter-logistics-and-delivery|https://github.com/DruGuerrero/nurtricenter-logistics-and-delivery.git"
+  "ms5-logistics-and-delivery|https://github.com/Nur-tricenter/ms5-logistics-and-delivery.git"
   "ms4-delivery-schedule-management|https://github.com/Nur-tricenter/ms4-delivery-schedule-management.git"
 )
 
