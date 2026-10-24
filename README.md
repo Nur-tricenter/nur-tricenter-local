@@ -33,6 +33,7 @@ Each business process declares the profile it belongs to:
 |---|---|
 | *(none)* | Infrastructure only: Postgres, RabbitMQ, Consul |
 | `catalog` | `catalog-api` + `catalog-workerservice` |
+| `ms1` | `clinica-nutricional-api` + `clinica-nutricional-workerservice` |
 | `gateway` | `apigateway-webapp` |
 
 ```bash
