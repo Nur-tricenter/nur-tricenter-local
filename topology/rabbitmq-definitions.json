@@ -77,6 +77,116 @@
                           "arguments":  {
 
                                         }
+                      },
+                      {
+                          "name":  "courier-created",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "courier-status-changed",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "route-created",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "courier-assigned-to-route",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "delivery-added-to-route",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "route-started",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "route-completed",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "route-cancelled",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "delivery-completed",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "delivery-failed",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
                       }
                   ],
     "queues":  [

@@ -77,6 +77,11 @@ include:
   # repository's own docker-compose.yml, which is standalone.
   - path: ../../nur-tricenter-identity/identity.compose.yml
 
+  # ms5 (logistics and delivery): API + outbox worker, same arrangement. The repository
+  # folder name differs between clones (the GitHub name vs a course checkout), so it is
+  # read from NURTRICENTER_REPO_DIR, defaulting to the name setup-project clones it as.
+  - path: ../../${NURTRICENTER_REPO_DIR:-nurtricenter-logistics-and-delivery}/nurtricenter.compose.yml
+
 services:
   gateway:
     # The runtime tag follows THIS project's TargetFramework (net10.0): the gateway

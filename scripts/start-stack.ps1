@@ -38,6 +38,9 @@ $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
+# ms5's folder name differs between clones; the compose include reads the same variable.
+$nurtricenterDir   = if ($env:NURTRICENTER_REPO_DIR) { $env:NURTRICENTER_REPO_DIR } else { 'nurtricenter-logistics-and-delivery' }
+$nurtricenterRoot  = Join-Path $repoRoot "..\$nurtricenterDir"
 
 # 0. Make sure no stale containers are squatting the names we need. Same
 # pattern as start-infrastructure.ps1: rm first, then up. The named
@@ -47,6 +50,7 @@ $expected = @(
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     # Microservice processes (container_name declared in docker-compose.yml)
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
+    'nur-tricenter-nurtricenter-api','nur-tricenter-nurtricenter-workerservice',
     # Platform: gateway (container_name declared in docker-compose.yml)
     'nur-tricenter-gateway'
 )
@@ -76,6 +80,8 @@ Write-Host "Building catalog, identity and gateway ..."
 & dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj')            -c Debug | Out-Null
 & dotnet build (Join-Path $identityRoot 'src\Identity.WorkerService\Identity.WorkerService.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.Api\Nurtricenter.Api.csproj') -c Debug | Out-Null
+& dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.WorkerService\Nurtricenter.WorkerService.csproj') -c Debug | Out-Null
 & dotnet build (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj')            -c Debug | Out-Null
 
 # 2. Bring up infra + business processes in one shot. docker compose writes
@@ -123,6 +129,8 @@ Write-Host "  - Consul UI:    http://localhost:8500"
 Write-Host "  - RabbitMQ UI:  http://localhost:15672  (guest / guest)"
 Write-Host "  - Gateway:      http://localhost:15005"
 Write-Host "  - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)"
+Write-Host "  - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)"
+Write-Host "    (uses its own Neon database: ConnectionStrings__DefaultConnection in $nurtricenterRoot\.env)"
 Write-Host ""
 Write-Host "Test the gateway with:"
 Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"
