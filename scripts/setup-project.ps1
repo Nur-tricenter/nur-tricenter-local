@@ -50,6 +50,7 @@ $repositories = @(
     @{ Name = 'nur-tricenter-api-gateway';       Url = 'https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git' }
     @{ Name = 'nur-tricenter-shared-kernels';    Url = 'https://github.com/Nur-tricenter/nur-tricenter-shared-kernels.git' }
     @{ Name = 'nurtricenter-logistics-and-delivery'; Url = 'https://github.com/DruGuerrero/nurtricenter-logistics-and-delivery.git' }
+    @{ Name = 'delivery-schedule-management';    Url = 'https://github.com/nur-university/modulo-2-actividad-3-franklin-andre.git' }
 )
 
 Write-Host ''

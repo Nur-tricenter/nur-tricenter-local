@@ -47,6 +47,7 @@ repositories=(
   "nur-tricenter-api-gateway|https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git"
   "nur-tricenter-shared-kernels|https://github.com/Nur-tricenter/nur-tricenter-shared-kernels.git"
   "nurtricenter-logistics-and-delivery|https://github.com/DruGuerrero/nurtricenter-logistics-and-delivery.git"
+  "delivery-schedule-management|https://github.com/nur-university/modulo-2-actividad-3-franklin-andre.git"
 )
 
 echo
