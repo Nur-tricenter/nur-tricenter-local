@@ -46,6 +46,7 @@ repositories=(
   "nur-tricenter-identity|https://github.com/Nur-tricenter/nur-tricenter-identity.git"
   "nur-tricenter-api-gateway|https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git"
   "nur-tricenter-shared-kernels|https://github.com/Nur-tricenter/nur-tricenter-shared-kernels.git"
+  "nurtricenter-logistics-and-delivery|https://github.com/DruGuerrero/nurtricenter-logistics-and-delivery.git"
 )
 
 echo

@@ -379,7 +379,25 @@ appears in no `up`. This is what keeps teams from conflicting on the platform re
 | nur-tricenter-catalog-workerservice | catalog-workerservice | 8080 |
 | nur-tricenter-identity-api | identity-api | 8080 |
 | nur-tricenter-identity-workerservice | identity-workerservice | 8080 |
+| nur-tricenter-nurtricenter-api | nurtricenter-api | 8080 |
+| nur-tricenter-nurtricenter-workerservice | nurtricenter-workerservice | — (no HTTP) |
 | nur-tricenter-gateway | gateway | host 15005 → 8080 |
+
+### ms5 (logistics and delivery)
+
+Included from `../<ms5 repo>/nurtricenter.compose.yml`. The folder is read from
+`NURTRICENTER_REPO_DIR` (default `nurtricenter-logistics-and-delivery`, the name `setup-project`
+clones it as); set it if your checkout has another name, e.g.
+`$env:NURTRICENTER_REPO_DIR = 'modulo-2-actividad-3-DruGuerrero'`.
+
+- Does NOT use the platform Postgres: ms5 runs on its own Neon cloud database. The connection
+  string is a secret, so it lives in a gitignored `.env` in the ms5 repository
+  (`ConnectionStrings__DefaultConnection=...`, see its `.env.example`). Without it the ms5
+  containers start but fail on their first query.
+- Registers in Consul as `nurtricenter`: `curl http://localhost:15005/api/nurtricenter/v1/couriers`
+  answers only POST (create a courier); there is no list endpoint.
+- Publishes 10 fanout exchanges (`courier-created`, `route-started`, `delivery-failed`, ...),
+  declared in `rabbitmq-definitions.json`. Contracts: `Nur.Tricenter.Integration.Messages.Logistics`.
 
 ### Verify
 

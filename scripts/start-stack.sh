@@ -21,11 +21,14 @@ COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
+# ms5's folder name differs between clones; the compose include reads the same variable.
+NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-nurtricenter-logistics-and-delivery}"
 
 # 0. Make sure no stale containers are squatting the names we need.
 EXPECTED=(
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
     nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
+    nur-tricenter-nurtricenter-api nur-tricenter-nurtricenter-workerservice
     nur-tricenter-gateway
 )
 for name in "${EXPECTED[@]}"; do
@@ -47,6 +50,8 @@ fi
 echo "Building catalog and gateway ..."
 dotnet build "$CATALOG_ROOT/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
+dotnet build "$NURTRICENTER_ROOT/src/Nurtricenter.Api/Nurtricenter.Api.csproj" -c Debug >/dev/null
+dotnet build "$NURTRICENTER_ROOT/src/Nurtricenter.WorkerService/Nurtricenter.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$GATEWAY_ROOT/ApiGateway.App/ApiGateway.App.csproj" -c Debug >/dev/null
 
 # 2. Bring up infra + 3 business processes in one shot.
@@ -68,7 +73,10 @@ Stack ready.
   - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
   - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)
+  - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)
 
 Test the gateway with:
   curl http://localhost:15005/api/catalog/v1/foods
+
+ms5 uses its own Neon database: ConnectionStrings__DefaultConnection in $NURTRICENTER_ROOT/.env
 EOF
