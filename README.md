@@ -385,10 +385,11 @@ appears in no `up`. This is what keeps teams from conflicting on the platform re
 
 ### ms5 (logistics and delivery)
 
-Included from `../<ms5 repo>/nurtricenter.compose.yml`. The folder is read from
-`NURTRICENTER_REPO_DIR` (default `nurtricenter-logistics-and-delivery`, the name `setup-project`
-clones it as); set it if your checkout has another name, e.g.
-`$env:NURTRICENTER_REPO_DIR = 'modulo-2-actividad-3-DruGuerrero'`.
+Repository: [Nur-tricenter/ms5-logistics-and-delivery](https://github.com/Nur-tricenter/ms5-logistics-and-delivery),
+cloned by `setup-project` as `ms5-logistics-and-delivery`. Included from
+`../ms5-logistics-and-delivery/nurtricenter.compose.yml`. If your checkout has another folder
+name, set `NURTRICENTER_REPO_DIR` to it, e.g.
+`[Environment]::SetEnvironmentVariable("NURTRICENTER_REPO_DIR", "my-ms5-folder", "User")`.
 
 - Does NOT use the platform Postgres: ms5 runs on its own Neon cloud database. The connection
   string is a secret, so it lives in a gitignored `.env` in the ms5 repository

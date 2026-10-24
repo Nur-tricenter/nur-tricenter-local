@@ -25,7 +25,7 @@ GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
 MS4_ROOT="$REPO_ROOT/../ms4-delivery-schedule-management"
 # ms5's folder name differs between clones; the compose include reads the same variable.
-NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-nurtricenter-logistics-and-delivery}"
+NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-delivery}"
 
 # 0. Make sure no stale containers are squatting the names we need.
 EXPECTED=(
