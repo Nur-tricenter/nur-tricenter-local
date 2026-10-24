@@ -146,7 +146,6 @@ networks:
     # The platform network. Created by whichever compose file starts
     # first, or by `docker network create`. Microservices attach to it
     # and resolve each other by container name.
-    name: nur-tricenter-net
     external: true
 
 volumes:

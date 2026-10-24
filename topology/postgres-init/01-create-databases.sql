@@ -39,3 +39,8 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms2-plans-and-recipes
 -- matching what IdentityDbContext maps.
 SELECT 'CREATE DATABASE nur_tricenter_identity'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_identity')\gexec
+
+
+-- MS4 (delivery calendar). Underscored: a hyphenated name would need quoting in CREATE DATABASE.
+SELECT 'CREATE DATABASE ms4_delivery_calendar'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms4_delivery_calendar')\gexec
