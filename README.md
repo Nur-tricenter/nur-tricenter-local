@@ -398,6 +398,18 @@ name, set `NURTRICENTER_REPO_DIR` to it, e.g.
   string is a secret, so it lives in a gitignored `.env` in the ms5 repository
   (`ConnectionStrings__DefaultConnection=...`, see its `.env.example`). Without it the ms5
   containers start but fail on their first query.
+- **Offline option** (no Neon credentials): point that `.env` at the platform Postgres, whose
+  `ms5_logistics` database `start-stack` creates, and apply ms5's migrations once from its repo
+  (ms5 does not migrate on startup):
+
+  ```bash
+  # ms5-logistics-and-delivery/.env
+  ConnectionStrings__DefaultConnection=Host=nur-tricenter-postgres;Port=5432;Database=ms5_logistics;Username=dev-only;Password=dev-only-password
+
+  # from ms5-logistics-and-delivery/, with the stack up (host port 5433)
+  dotnet ef database update --project src/Nurtricenter.Infrastructure --startup-project src/Nurtricenter.Api \
+    --connection "Host=localhost;Port=5433;Database=ms5_logistics;Username=dev-only;Password=dev-only-password"
+  ```
 - Registers in Consul as `nurtricenter`: `curl http://localhost:15005/api/nurtricenter/v1/couriers`
   answers only POST (create a courier); there is no list endpoint.
 - Publishes 10 fanout exchanges (`courier-created`, `route-started`, `delivery-failed`, ...),
@@ -418,6 +430,13 @@ cloned by `setup-project` as `ms3-contract-and-production`. Included from
   `GET /api/delivery-calendar/v1/calendars/active-tomorrow` for the daily production order.
 - Publishes `package-validated` (→ `ms5.package-validated`). Contract: `Nur.Tricenter.Integration.Messages.Contracting`.
 
+### ms1 (clinica nutricional) — not in the stack yet
+
+`setup-project` clones it, but it is neither included in the compose file nor built by `start-stack`:
+its repository has no platform fragment (`ms1.compose.yml`), and the service is not platform-ready
+yet (SQL Server with a hard-coded connection string, no Consul registration, no JWT). Add the
+include and the two builds back once that fragment exists.
+
 ### Verify
 
 ```bash
@@ -427,13 +446,30 @@ open http://localhost:8500   # Consul
 open http://localhost:15672  # RabbitMQ (guest/guest)
 ```
 
+### End-to-end smoke test
+
+`scripts/e2e-smoke.py` (Python 3, stdlib only) walks one patient through every service, through the
+gateway, and exits non-zero on the first broken hop:
+
+```bash
+python scripts/e2e-smoke.py                                         # patient 2, successful delivery
+python scripts/e2e-smoke.py 00000000-0000-0000-0000-000000000003 --fail   # failed delivery
+```
+
+It creates a plan in MS2, contracts and pays it in MS3 (which creates the MS4 calendar), sets the
+address and resolves tomorrow's menu in MS4, builds and validates the package in MS3, and lets MS5
+receive it (`package-validated`), deliver it and report back (`delivery-*`) until MS4 closes the day.
+It needs ms5's `package-validated` consumer, which lives on ms5's `dev` branch until it is merged.
+
 ### Notes
 
 - All business processes are **bind-mounted** from their own repo's `bin/Debug` output. A stale build
   directory is the most common cause of a container that starts and immediately crashes on a missing
   assembly — rebuild the project before restarting.
-- `start-stack` builds catalog (App + Worker), identity (App + WorkerService) and the gateway, so a
-  fresh clone comes up from a single command after `setup-project`.
+- `start-stack` builds every included service (and stops on the first failed build), starts the
+  infrastructure, creates any missing service database (Postgres runs `postgres-init/` only on a
+  brand-new volume), then starts the services and creates the `ms3-service`/`ms4-service` accounts,
+  so a fresh clone comes up from a single command after `setup-project`.
 - The gateway is the only service always mapped to a host port (sole public entry point). The catalog's
   `18080 → 8080` is dev-only.
 - Compose is the source of truth (Aspire AppHost was removed: Aspire 13.6.1 conflicts with the docker
