@@ -35,7 +35,6 @@ $repoRoot          = Split-Path -Parent $scriptDir           # the orchestrator 
 $composeDir        = Join-Path $repoRoot 'compose'
 $composeFile       = Join-Path $composeDir 'docker-compose.yml'
 $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
-$ms1Root           = Join-Path $repoRoot '..\ms1-clinica-nutricional'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
@@ -82,31 +81,45 @@ if (-not $existingNet) {
 # 1. Build the business projects on the host. The compose file
 # bind-mounts the output bin/Debug/ directories. Identity is included here
 # (it was previously a manual step) so the whole stack comes up from one command.
-Write-Host "Building clinica nutricional, catalog, identity, delivery calendar (ms4) and gateway ..."
-& dotnet build (Join-Path $ms1Root 'src\ClinicaNutricional.Api\ClinicaNutricional.Api.csproj')              -c Debug | Out-Null
-& dotnet build (Join-Path $ms1Root 'src\ClinicaNutricional.WorkerService\ClinicaNutricional.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj')              -c Debug | Out-Null
-& dotnet build (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj')            -c Debug | Out-Null
-& dotnet build (Join-Path $identityRoot 'src\Identity.WorkerService\Identity.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.Api\Nurtricenter.Api.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $nurtricenterRoot 'src\Nurtricenter.WorkerService\Nurtricenter.WorkerService.csproj') -c Debug | Out-Null
-& dotnet build (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj')            -c Debug | Out-Null
-# MS4 builds into its own artifacts\ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
-& dotnet build (Join-Path $ms4Root 'src\Api\Api.csproj')                                   -c Debug | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "MS4 API build failed" }
-& dotnet build (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj')               -c Debug | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "MS4 worker build failed" }
-& dotnet build (Join-Path $ms3Root 'Nurtricenter.Api\Nurtricenter.MS3.Api.csproj')                         -c Debug | Out-Null
-& dotnet build (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj') -c Debug | Out-Null
+# ms1 is not built: it is not part of the stack yet (see compose\docker-compose.yml).
+# Every build is checked: a failed build used to surface only as a container that never started.
+Write-Host "Building catalog, identity, ms5, gateway, delivery calendar (ms4) and contracting (ms3) ..."
+$projects = @(
+    (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj'),
+    (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj'),
+    (Join-Path $identityRoot 'src\Identity.App\Identity.App.csproj'),
+    (Join-Path $identityRoot 'src\Identity.WorkerService\Identity.WorkerService.csproj'),
+    (Join-Path $nurtricenterRoot 'src\Nurtricenter.Api\Nurtricenter.Api.csproj'),
+    (Join-Path $nurtricenterRoot 'src\Nurtricenter.WorkerService\Nurtricenter.WorkerService.csproj'),
+    (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj'),
+    # MS4 builds into its own artifacts\ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
+    (Join-Path $ms4Root 'src\Api\Api.csproj'),
+    (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj'),
+    (Join-Path $ms3Root 'Nurtricenter.Api\Nurtricenter.MS3.Api.csproj'),
+    (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj')
+)
+foreach ($project in $projects) {
+    & dotnet build $project -c Debug | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Build failed: $project" }
+}
 
 # 2. Bring up infra + business processes in one shot. docker compose writes
 # informational lines to stderr, which with $ErrorActionPreference='Stop' would
 # abort the script even on a successful up. Run it with the preference relaxed
 # and discard its output; the exit code is what matters.
-Write-Host "Starting infra + business processes via docker compose ..."
+#
+# Infra goes first, then every database is ensured. Postgres runs postgres-init\ only on a
+# brand-new volume, so a volume created before a service was added lacks its database and
+# that service's migrate job fails. The script is idempotent (CREATE only when missing).
 $previousErrorAction = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
+Write-Host "Starting infra (postgres, rabbitmq, consul) ..."
+docker compose -f $composeInfraFile -p nur-tricenter up -d --wait 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = $previousErrorAction; throw "infra did not become healthy" }
+Write-Host "Ensuring every service database exists ..."
+docker exec nur-tricenter-postgres psql -q -U dev-only -d postgres -f /docker-entrypoint-initdb.d/01-create-databases.sql 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = $previousErrorAction; throw "could not create the service databases" }
+Write-Host "Starting business processes via docker compose ..."
 docker compose -f $composeFile -f $composeInfraFile -p nur-tricenter up -d 2>&1 | Out-Null
 $composeExit = $LASTEXITCODE
 $ErrorActionPreference = $previousErrorAction

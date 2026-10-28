@@ -73,8 +73,14 @@ include:
   # a standalone stack with its own Postgres and network.
   - path: ../../ms2-plans-and-recipes-catalog/catalog.compose.yml
 
-  # ms1 (Clinica Nutricional): API + Worker, same arrangement.
-  - path: ../../ms1-clinica-nutricional/ms1.compose.yml
+  # Identity: migrate job + API + worker, same arrangement. Every other service logs in
+  # through it (service accounts), so the stack cannot work without this include.
+  - path: ../../nur-tricenter-identity/identity.compose.yml
+
+  # ms1 (Clinica Nutricional) is NOT included yet: its repository has no platform fragment
+  # (ms1.compose.yml) and the service is not platform-ready (SQL Server, no Consul, no JWT).
+  # Re-enable this line once the fragment exists:
+  # - path: ../../ms1-clinica-nutricional/ms1.compose.yml
 
 
   # MS4 (delivery calendar): API + migrate job + RabbitMQ worker, same arrangement. Repository

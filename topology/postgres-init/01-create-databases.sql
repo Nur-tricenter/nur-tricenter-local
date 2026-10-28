@@ -49,3 +49,8 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms4_delivery_calendar
 -- volume predates this line.
 SELECT 'CREATE DATABASE nur_tricenter_contracting'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_contracting')\gexec
+
+-- MS5 (logistics). Optional: ms5 normally uses its own Neon database. This one lets the
+-- stack run fully offline when ms5's .env points at nur-tricenter-postgres instead.
+SELECT 'CREATE DATABASE ms5_logistics'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms5_logistics')\gexec

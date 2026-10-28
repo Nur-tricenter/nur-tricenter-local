@@ -20,7 +20,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_DIR="$REPO_ROOT/compose"
 COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
 COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
-MS1_ROOT="$REPO_ROOT/../ms1-clinica-nutricional"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
@@ -56,9 +55,8 @@ if ! docker network ls --format '{{.Name}}' | grep -qx 'nur-tricenter-net'; then
 fi
 
 # 1. Build the business projects (their output folders are bind-mounted).
-echo "Building clinica nutricional, catalog, identity, delivery calendar (ms4) and gateway ..."
-dotnet build "$MS1_ROOT/src/ClinicaNutricional.Api/ClinicaNutricional.Api.csproj" -c Debug >/dev/null
-dotnet build "$MS1_ROOT/src/ClinicaNutricional.WorkerService/ClinicaNutricional.WorkerService.csproj" -c Debug >/dev/null
+# ms1 is not built: it is not part of the stack yet (see compose/docker-compose.yml).
+echo "Building catalog, identity, ms5, gateway, delivery calendar (ms4) and contracting (ms3) ..."
 dotnet build "$CATALOG_ROOT/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$IDENTITY_ROOT/src/Identity.App/Identity.App.csproj" -c Debug >/dev/null
@@ -72,8 +70,18 @@ dotnet build "$MS4_ROOT/src/WorkerService/WorkerService.csproj" -c Debug >/dev/n
 dotnet build "$MS3_ROOT/Nurtricenter.Api/Nurtricenter.MS3.Api.csproj" -c Debug >/dev/null
 dotnet build "$MS3_ROOT/Nurtricenter.MS3.WorkerService/Nurtricenter.MS3.WorkerService.csproj" -c Debug >/dev/null
 
-# 2. Bring up infra + business processes in one shot.
-echo "Starting infra + business processes via docker compose ..."
+# 2. Infra first, then make sure every database exists. Postgres runs postgres-init/ only on
+# a brand-new volume, so a volume created before a service was added lacks its database and
+# that service's migrate job fails. The script is idempotent (CREATE only when missing).
+echo "Starting infra (postgres, rabbitmq, consul) ..."
+docker compose -f "$COMPOSE_INFRA_FILE" -p nur-tricenter up -d --wait
+echo "Ensuring every service database exists ..."
+# MSYS_NO_PATHCONV: Git Bash on Windows would rewrite the in-container path below.
+MSYS_NO_PATHCONV=1 docker exec nur-tricenter-postgres psql -q -U dev-only -d postgres \
+    -f /docker-entrypoint-initdb.d/01-create-databases.sql >/dev/null
+
+# 3. Business processes.
+echo "Starting business processes via docker compose ..."
 docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_INFRA_FILE" -p nur-tricenter up -d
 
 # 3. Apply the catalog schema. The catalog Startup calls AddSecurity, which refuses
@@ -134,7 +142,6 @@ Stack ready.
   - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
   - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)
-  - Clinica Nutricional API: internal only (reachable through the gateway as /api/clinica-nutricional/v1/...)
   - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)
   - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)
 
