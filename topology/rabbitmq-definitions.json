@@ -292,6 +292,33 @@
                                      }
                    },
                    {
+                       "name":  "ms4.delivery-added-to-route",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms4.delivery-completed",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms4.delivery-failed",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
                        "name":  "ms4.meal-plan-published",
                        "vhost":  "/",
                        "durable":  true,
@@ -576,6 +603,36 @@
                          "source":  "food-published",
                          "vhost":  "/",
                          "destination":  "ms3.food-published",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "delivery-added-to-route",
+                         "vhost":  "/",
+                         "destination":  "ms4.delivery-added-to-route",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "delivery-completed",
+                         "vhost":  "/",
+                         "destination":  "ms4.delivery-completed",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "delivery-failed",
+                         "vhost":  "/",
+                         "destination":  "ms4.delivery-failed",
                          "destination_type":  "queue",
                          "routing_key":  "",
                          "arguments":  {
