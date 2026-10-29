@@ -459,8 +459,9 @@ python scripts/e2e-smoke.py 00000000-0000-0000-0000-000000000003 --fail   # fail
 It creates a plan in MS2, contracts and pays it in MS3 (which creates the MS4 calendar), sets the
 address and resolves tomorrow's menu in MS4, builds and validates the package in MS3, and lets MS5
 receive it (`package-validated`) into **tomorrow's** route (the message's `DeliveryDate`), deliver it
-and report back (`delivery-*`) until MS4 closes the day. It needs MS3 and MS5 built with
-`Nur.Tricenter.Integration` 1.3.0.
+and report back (`delivery-*`) until MS4 closes the day. It needs MS3, MS4 and MS5 built with
+`Nur.Tricenter.Integration` 1.4.0: MS4 links the MS5 delivery to its day by `DeliveryDayId`. Dates are
+taken in UTC, like the services, so the script also works after 20:00 Bolivia time.
 
 ### Notes
 

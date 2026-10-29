@@ -17,7 +17,8 @@ patientId must be one of MS3's simulated patients (00000000-0000-0000-0000-00000
 A few lookups read the databases through `docker exec nur-tricenter-postgres psql`, because no
 service exposes them (e.g. which MS4 calendar a contract produced). Exit code 0 = all green.
 
-Needs MS3 and MS5 with Nur.Tricenter.Integration 1.3.0 (PackageValidated carries DeliveryDate).
+Needs MS3, MS4 and MS5 with Nur.Tricenter.Integration 1.4.0 (PackageValidated carries DeliveryDate and
+DeliveryDayId; MS4 links the delivery to its day by DeliveryDayId).
 """
 import json, subprocess, sys, time, urllib.request, urllib.error, datetime as dt
 
@@ -76,7 +77,9 @@ def check(desc, cond):
 
 def main():
     stamp = dt.datetime.now().strftime("%H%M%S")
-    today = dt.date.today()
+    # The services compute "tomorrow" in UTC (containers run on UTC); the local date drifts from it
+    # every evening (after 20:00 in Bolivia, UTC-4), so the test must use the UTC date too.
+    today = dt.datetime.now(dt.timezone.utc).date()
     tomorrow = today + dt.timedelta(days=1)
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     patient = args[0] if args else "00000000-0000-0000-0000-000000000002"
