@@ -6,7 +6,7 @@ Walks one patient through every service, always through the gateway:
   -> MS3 contract + payment -> MS3 worker -> MS4 POST /schedule
   -> MS4 address + resolve-daily-catalog (MS4 -> MS2) -> active-tomorrow
   -> MS3 daily-order (MS3 -> MS4) + package assemble/label/validate
-  -> package-validated -> MS5 adds the delivery to today's route
+  -> package-validated -> MS5 adds the delivery to the route of its delivery date (tomorrow)
   -> delivery-added-to-route -> MS4 links the delivery to the day
   -> MS5 deliver (or --fail) -> delivery-completed/failed -> MS4 closes the day
 
@@ -17,7 +17,7 @@ patientId must be one of MS3's simulated patients (00000000-0000-0000-0000-00000
 A few lookups read the databases through `docker exec nur-tricenter-postgres psql`, because no
 service exposes them (e.g. which MS4 calendar a contract produced). Exit code 0 = all green.
 
-Needs ms5's package-validated consumer (ms5 `dev` until it is merged to `main`).
+Needs MS3 and MS5 with Nur.Tricenter.Integration 1.3.0 (PackageValidated carries DeliveryDate).
 """
 import json, subprocess, sys, time, urllib.request, urllib.error, datetime as dt
 
@@ -141,9 +141,10 @@ def main():
     mine = [x for x in at if x["packId"] == day_id]
     check("active-tomorrow lists the day with its menu", bool(mine) and bool(mine[0].get("menu")))
 
-    print("== MS5: courier + today's route (must exist before the package arrives)")
+    # MS3 produces for tomorrow and PackageValidated carries that DeliveryDate, so the route is tomorrow's.
+    print("== MS5: courier + tomorrow's route (must exist before the package arrives)")
     _, courier = call("POST", "/api/nurtricenter/v1/couriers", {"fullName": f"Repartidor {stamp}"})
-    _, route = call("POST", "/api/nurtricenter/v1/routes", {"courierId": courier["id"], "scheduledDate": today.isoformat()})
+    _, route = call("POST", "/api/nurtricenter/v1/routes", {"courierId": courier["id"], "scheduledDate": tomorrow.isoformat()})
 
     print("== MS3: production order, package, assemble, label, validate")
     _, order = call("GET", f"/api/contracting/v1/production/daily-order?productionDate={tomorrow}")
@@ -167,18 +168,15 @@ def main():
     call("POST", "/api/contracting/v1/production/packages/validate",
          {"productionOrderId": oid, "supervisorId": "sup-01", "batchValidated": True, "totalValidatedCount": 0})
 
-    print("== MS5: package-validated consumed into today's route")
-    delivery = wait("delivery on the route", lambda: (lambda r: next(
-        (d["packageDeliveryId"] for d in r[1].get("deliveries", []) if d.get("patientName") == patient), None)
-        if r[0] == 200 else None)(
-        call("GET", f"/api/nurtricenter/v1/couriers/{courier['id']}/route/today", quiet=True)))
+    # MS5 has no read endpoint for a future route (route/today only shows today's), and its database is
+    # on Neon. MS4 records the MS5 delivery id when it consumes delivery-added-to-route, so read it there:
+    # this proves package-validated -> MS5 -> delivery-added-to-route -> MS4 in one step.
+    print("== MS5 -> MS4: package-validated added to tomorrow's route, linked to the day")
+    delivery = wait("MS5 delivery linked to the day (DeliveryRouteLinks)", lambda: sql(
+        "ms4_delivery_calendar", f"select \"DeliveryId\" from \"DeliveryRouteLinks\" where \"DayId\"='{day_id}'"))
     if not delivery:
         FAILS.append("aborted")
         return
-
-    print("== MS4: delivery-added-to-route linked to the day")
-    wait("MS4 link (DeliveryRouteLinks)", lambda: sql(
-        "ms4_delivery_calendar", f"select \"DayId\" from \"DeliveryRouteLinks\" where \"DeliveryId\"='{delivery}'"), timeout=30)
 
     print("== MS5: start route, deliver")
     call("POST", f"/api/nurtricenter/v1/routes/{route['id']}/start")
