@@ -13,7 +13,9 @@ Walks one patient through every service, always through the gateway:
 Usage:
   python scripts/e2e-smoke.py [patientId] [--fail]
 
-patientId must be one of MS3's simulated patients (00000000-0000-0000-0000-00000000000{1,2,3}).
+With no patientId it registers a fresh patient in MS1 first (MS3 reads patients from MS1 through
+`Clinic__BaseUrl`). A patientId you pass must already exist in MS1. Against an MS3 without
+`Clinic__BaseUrl` (simulated patients) pass one of 00000000-0000-0000-0000-00000000000{1,2,3}.
 A few lookups read the databases through `docker exec nur-tricenter-postgres psql`, because no
 service exposes them (e.g. which MS4 calendar a contract produced). Exit code 0 = all green.
 
@@ -82,12 +84,24 @@ def main():
     today = dt.datetime.now(dt.timezone.utc).date()
     tomorrow = today + dt.timedelta(days=1)
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    patient = args[0] if args else "00000000-0000-0000-0000-000000000002"
     fail = "--fail" in sys.argv
 
     print("== identity")
     _, p = call("POST", "/api/identity-service/v1/auth/login", {"userName": "admin", "password": "admin"})
     tok = p["accessToken"]
+
+    if args:
+        patient = args[0]
+    else:
+        print("== MS1: register the patient")
+        code, created = call("POST", "/api/clinica-nutricional/v1/Patient/CreatePaciente",
+                             {"ci": f"E2E{stamp}", "nombre": "Ana", "apellido": f"E2E {stamp}"}, tok)
+        if code != 200 or not created.get("isSuccess"):
+            FAILS.append("aborted")
+            return
+        patient = created["value"]
+        check("MS1 returns the patient it just stored",
+              call("GET", f"/api/clinica-nutricional/v1/Patient/{patient}", token=tok, quiet=True)[0] == 200)
 
     print("== MS2: recipes + 15-day plan with a day-1 menu")
     recipes = []
@@ -121,6 +135,10 @@ def main():
     if not contract:
         FAILS.append("aborted")
         return
+    # The plan is known to MS3 by now, so a 404 here can only be the patient lookup in MS1.
+    code, _ = call("POST", "/api/contracting/v1/contracts",
+                   {"patientId": "ffffffff-0000-0000-0000-00000000dead", "catalogPlanId": plan}, ok=(404,), quiet=True)
+    check("MS3 rejects a patient MS1 does not have (404)", code == 404)
     call("POST", "/api/contracting/v1/billing/charge-plan",
          {"contractId": contract, "amount": 150.0, "invoiceNumber": f"inv-e2e-{stamp}"})
 

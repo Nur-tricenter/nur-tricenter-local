@@ -93,6 +93,15 @@ done
 echo
 echo "  $cloned clonado(s), $present ya estaban."
 
+# ms5 reads its connection string from a gitignored .env (its default is a private Neon database). Seed
+# one that points at the platform Postgres so a fresh clone runs offline; the nurtricenter-migrate job
+# creates the schema. An existing .env is never touched.
+ms5_dir="$workspace/ms5-logistics-and-delivery"
+if [ -f "$ms5_dir/.env.local-postgres.example" ] && [ ! -e "$ms5_dir/.env" ]; then
+  cp "$ms5_dir/.env.local-postgres.example" "$ms5_dir/.env"
+  echo "  ms5: creado .env apuntando al Postgres de la plataforma (BD local, sin Neon)."
+fi
+
 if [ "$cloned" -eq 0 ] && [ "$present" -eq "${#repositories[@]}" ]; then
   echo
   echo "  Nada que hacer: el workspace ya estaba completo."
