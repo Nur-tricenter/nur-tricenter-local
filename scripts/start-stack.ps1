@@ -56,7 +56,7 @@ $expected = @(
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
     'nur-tricenter-identity-migrate','nur-tricenter-identity-api','nur-tricenter-identity-workerservice',
     'nur-tricenter-delivery-calendar-migrate','nur-tricenter-delivery-calendar-api','nur-tricenter-delivery-calendar-workerservice',
-    'nur-tricenter-nurtricenter-api','nur-tricenter-nurtricenter-workerservice',
+    'nur-tricenter-nurtricenter-migrate','nur-tricenter-nurtricenter-api','nur-tricenter-nurtricenter-workerservice',
     'nur-tricenter-contracting-api','nur-tricenter-contracting-workerservice',
     # Platform: gateway (container_name declared in docker-compose.yml)
     'nur-tricenter-gateway'
@@ -219,7 +219,7 @@ Write-Host "  - Catalog API:   internal only (reachable through the gateway as /
 Write-Host "  - Clinica nutricional (ms1): internal only (through the gateway as /api/clinica-nutricional/v1/...)"
 Write-Host "  - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)"
 Write-Host "  - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)"
-Write-Host "    (uses its own Neon database: ConnectionStrings__DefaultConnection in $nurtricenterRoot\.env)"
+Write-Host "    (database: ConnectionStrings__DefaultConnection in $nurtricenterRoot\.env; its schema is applied by the nurtricenter-migrate job)"
 Write-Host ""
 Write-Host "Test the gateway with:"
 Write-Host "  curl http://localhost:15005/api/catalog/v1/foods"

@@ -36,7 +36,7 @@ EXPECTED=(
     nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
     nur-tricenter-identity-migrate nur-tricenter-identity-api nur-tricenter-identity-workerservice
     nur-tricenter-delivery-calendar-migrate nur-tricenter-delivery-calendar-api nur-tricenter-delivery-calendar-workerservice
-    nur-tricenter-nurtricenter-api nur-tricenter-nurtricenter-workerservice
+    nur-tricenter-nurtricenter-migrate nur-tricenter-nurtricenter-api nur-tricenter-nurtricenter-workerservice
     nur-tricenter-contracting-api nur-tricenter-contracting-workerservice
     nur-tricenter-gateway
 )
@@ -150,5 +150,5 @@ Stack ready.
 Test the gateway with:
   curl http://localhost:15005/api/catalog/v1/foods
 
-ms5 uses its own Neon database: ConnectionStrings__DefaultConnection in $NURTRICENTER_ROOT/.env
+ms5 database: ConnectionStrings__DefaultConnection in $NURTRICENTER_ROOT/.env (its schema is applied by the nurtricenter-migrate job)
 EOF

@@ -96,6 +96,17 @@ foreach ($repo in $repositories) {
 Write-Host ''
 Write-Host "  $cloned clonado(s), $present ya estaban." -ForegroundColor Cyan
 
+# ms5 reads its connection string from a gitignored .env (its default is a private Neon database). Seed
+# one that points at the platform Postgres so a fresh clone runs offline; the nurtricenter-migrate job
+# creates the schema. An existing .env is never touched.
+$ms5Dir = Join-Path $workspace 'ms5-logistics-and-delivery'
+$ms5Env = Join-Path $ms5Dir '.env'
+$ms5Example = Join-Path $ms5Dir '.env.local-postgres.example'
+if ((Test-Path $ms5Example) -and -not (Test-Path $ms5Env)) {
+    Copy-Item $ms5Example $ms5Env
+    Write-Host '  ms5: creado .env apuntando al Postgres de la plataforma (BD local, sin Neon).' -ForegroundColor Green
+}
+
 if ($cloned -eq 0 -and $present -eq $repositories.Count) {
     Write-Host ''
     Write-Host '  Nada que hacer: el workspace ya estaba completo.'

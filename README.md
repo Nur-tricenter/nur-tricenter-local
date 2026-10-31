@@ -394,22 +394,20 @@ cloned by `setup-project` as `ms5-logistics-and-delivery`. Included from
 name, set `NURTRICENTER_REPO_DIR` to it, e.g.
 `[Environment]::SetEnvironmentVariable("NURTRICENTER_REPO_DIR", "my-ms5-folder", "User")`.
 
-- Does NOT use the platform Postgres: ms5 runs on its own Neon cloud database. The connection
-  string is a secret, so it lives in a gitignored `.env` in the ms5 repository
-  (`ConnectionStrings__DefaultConnection=...`, see its `.env.example`). Without it the ms5
-  containers start but fail on their first query.
-- **Offline option** (no Neon credentials): point that `.env` at the platform Postgres, whose
-  `ms5_logistics` database `start-stack` creates, and apply ms5's migrations once from its repo
-  (ms5 does not migrate on startup):
+- The database is whatever the gitignored `.env` in the ms5 repository points to
+  (`ConnectionStrings__DefaultConnection=...`). The default in `.env.example` is ms5's private Neon
+  database; without a `.env` the ms5 containers start but fail on their first query.
+- **Offline option** (no Neon credentials): `setup-project` seeds that `.env` from
+  `.env.local-postgres.example` when it is missing, pointing at the platform Postgres, whose
+  `ms5_logistics` database `start-stack` creates:
 
   ```bash
   # ms5-logistics-and-delivery/.env
   ConnectionStrings__DefaultConnection=Host=nur-tricenter-postgres;Port=5432;Database=ms5_logistics;Username=dev-only;Password=dev-only-password
-
-  # from ms5-logistics-and-delivery/, with the stack up (host port 5433)
-  dotnet ef database update --project src/Nurtricenter.Infrastructure --startup-project src/Nurtricenter.Api \
-    --connection "Host=localhost;Port=5433;Database=ms5_logistics;Username=dev-only;Password=dev-only-password"
   ```
+- The schema is applied by the one-shot `nur-tricenter-nurtricenter-migrate` container
+  (`dotnet Nurtricenter.Api.dll --migrate`); the API and the worker wait for it to exit 0. No manual
+  `dotnet ef database update` is needed any more.
 - Registers in Consul as `nurtricenter`: `curl http://localhost:15005/api/nurtricenter/v1/couriers`
   answers only POST (create a courier); there is no list endpoint.
 - Publishes 10 fanout exchanges (`courier-created`, `route-started`, `delivery-failed`, ...),
@@ -423,7 +421,8 @@ cloned by `setup-project` as `ms3-contract-and-production`. Included from
 
 - Uses the platform Postgres, database `nur_tricenter_contracting` (created by `01-create-databases.sql`;
   the API also creates it on its first migration).
-- Registers in Consul as `contracting`: `curl http://localhost:15005/api/contracting/v1/sim/patients/00000000-0000-0000-0000-000000000001`.
+- Registers in Consul as `contracting`: `curl http://localhost:15005/api/contracting/v1/sim/patients/<ms1-patient-id>`
+  (patients come from MS1 through `Clinic__BaseUrl`; the 3 simulated ones are only used when it is unset).
 - Consumes `ms3.meal-plan-published`, `ms3.recipe-published` and `ms3.recipe-updated` (catalog).
 - Calls MS4 through the gateway as service account `ms3-service` (created by `start-stack`):
   `POST /api/delivery-calendar/v1/schedule` after a payment (from its outbox, idempotent by `contractId`) and
@@ -459,11 +458,13 @@ open http://localhost:15672  # RabbitMQ (guest/guest)
 gateway, and exits non-zero on the first broken hop:
 
 ```bash
-python scripts/e2e-smoke.py                                         # patient 2, successful delivery
-python scripts/e2e-smoke.py 00000000-0000-0000-0000-000000000003 --fail   # failed delivery
+python scripts/e2e-smoke.py                    # registers a new patient in MS1, successful delivery
+python scripts/e2e-smoke.py --fail             # same, but the delivery fails
+python scripts/e2e-smoke.py <ms1-patient-id>   # reuse a patient that already exists in MS1
 ```
 
-It creates a plan in MS2, contracts and pays it in MS3 (which creates the MS4 calendar), sets the
+MS3 reads patients from MS1 (`Clinic__BaseUrl`), so the script first registers a patient in MS1 and
+checks that MS3 rejects an unknown one (404). It creates a plan in MS2, contracts and pays it in MS3 (which creates the MS4 calendar), sets the
 address and resolves tomorrow's menu in MS4, builds and validates the package in MS3, and lets MS5
 receive it (`package-validated`) into **tomorrow's** route (the message's `DeliveryDate`), deliver it
 and report back (`delivery-*`) until MS4 closes the day. It needs MS3, MS4 and MS5 built with
