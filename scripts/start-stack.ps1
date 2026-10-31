@@ -99,7 +99,9 @@ $projects = @(
     (Join-Path $ms4Root 'src\Api\Api.csproj'),
     (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj'),
     (Join-Path $ms3Root 'Nurtricenter.Api\Nurtricenter.MS3.Api.csproj'),
-    (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj')
+    (Join-Path $ms3Root 'Nurtricenter.MS3.WorkerService\Nurtricenter.MS3.WorkerService.csproj'),
+    # Presentation dashboard (http://localhost:15100), lives in this repository.
+    (Join-Path $PSScriptRoot '..\demo-console\src\DemoConsole\DemoConsole.csproj')
 )
 foreach ($project in $projects) {
     & dotnet build $project -c Debug | Out-Null

@@ -1,0 +1,48 @@
+# =============================================================================
+#  Demo console: presentation dashboard for the whole platform, http://localhost:15100
+#
+#  Included by compose/docker-compose.yml. Same arrangement as the microservices: the
+#  binaries are bind-mounted from the host build (start-stack builds them first).
+#  wwwroot is mounted on its own, so HTML/CSS/JS edits show up on a browser refresh
+#  without rebuilding or restarting anything.
+#
+#  It reaches every platform container by name on nur-tricenter-net:
+#    gateway (business calls), Consul (registry), RabbitMQ (event tap + management API)
+#    and Postgres (read-only: outbox/inbox rows, gap X-17 lookups).
+#  Values are DEV-ONLY, like the rest of the local stack.
+# =============================================================================
+
+services:
+  demo-console:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    container_name: nur-tricenter-demo-console
+    hostname: demo-console
+    working_dir: /app
+    command: ["dotnet", "DemoConsole.dll"]
+    volumes:
+      - ./src/DemoConsole/bin/Debug/net10.0:/app:ro
+      - ./src/DemoConsole/wwwroot:/app/wwwroot:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Upstreams__Gateway: "http://nur-tricenter-gateway:8080"
+      Upstreams__Consul: "http://nur-tricenter-consul:8500"
+      Upstreams__RabbitManagement: "http://nur-tricenter-rabbitmq:15672"
+      RabbitMq__Host: nur-tricenter-rabbitmq
+      Postgres__Server: "Host=nur-tricenter-postgres;Port=5432;Username=dev-only;Password=dev-only-password;Timeout=5;Command Timeout=5"
+    ports:
+      - "15100:8080"
+    networks: [nur-tricenter-net]
+    # No depends_on: an included file can't reference the gateway declared in the parent file.
+    # Nothing needs it at startup anyway: the proxy is lazy and the event tap retries every 5 s.
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+networks:
+  nur-tricenter-net:
+    external: true
