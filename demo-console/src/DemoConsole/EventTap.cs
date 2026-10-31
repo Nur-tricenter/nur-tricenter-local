@@ -50,16 +50,9 @@ public sealed class EventTap(IConfiguration config, EventHub hub, ILogger<EventT
         var queue = section["TapQueue"] ?? "demo-console.tap";
         await channel.QueueDeclareAsync(queue, durable: false, exclusive: true, autoDelete: true, cancellationToken: ct);
 
-        var bound = new List<string>();
-        foreach (var exchange in section.GetSection("Exchanges").Get<string[]>() ?? [])
-        {
-            if (await ExchangeExistsAsync(connection, exchange, ct))
-            {
-                await channel.QueueBindAsync(queue, exchange, routingKey: "", cancellationToken: ct);
-                bound.Add(exchange);
-            }
-        }
-        logger.LogInformation("Event tap listening on {Count} exchanges: {Exchanges}", bound.Count, string.Join(", ", bound));
+        var pending = new HashSet<string>(section.GetSection("Exchanges").Get<string[]>() ?? []);
+        await BindAvailableAsync(connection, channel, queue, pending, ct);
+        logger.LogInformation("Event tap listening; {Count} exchange(s) not declared yet: {Missing}", pending.Count, string.Join(", ", pending));
 
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += (_, ea) =>
@@ -73,11 +66,30 @@ public sealed class EventTap(IConfiguration config, EventHub hub, ILogger<EventT
         };
         await channel.BasicConsumeAsync(queue, autoAck: true, consumer, ct);
 
-        // Stay here until the connection drops or the host stops.
+        // Stay here until the connection drops or the host stops. Some exchanges only appear when
+        // their publisher first sends (e.g. MS1 declares paciente-published at runtime), so keep
+        // retrying the missing ones.
         var closed = new TaskCompletionSource();
         connection.ConnectionShutdownAsync += (_, _) => { closed.TrySetResult(); return Task.CompletedTask; };
-        await closed.Task.WaitAsync(ct);
+        while (!closed.Task.IsCompleted)
+        {
+            await Task.WhenAny(closed.Task, Task.Delay(TimeSpan.FromSeconds(15), ct));
+            ct.ThrowIfCancellationRequested();
+            if (pending.Count > 0 && !closed.Task.IsCompleted)
+                await BindAvailableAsync(connection, channel, queue, pending, ct);
+        }
         throw new InvalidOperationException("connection closed");
+    }
+
+    private async Task BindAvailableAsync(IConnection connection, IChannel channel, string queue, HashSet<string> pending, CancellationToken ct)
+    {
+        foreach (var exchange in pending.ToArray())
+        {
+            if (!await ExchangeExistsAsync(connection, exchange, ct)) continue;
+            await channel.QueueBindAsync(queue, exchange, routingKey: "", cancellationToken: ct);
+            pending.Remove(exchange);
+            logger.LogInformation("Event tap bound to {Exchange}", exchange);
+        }
     }
 
     // A passive declare on a missing exchange closes the channel, so each check gets its own.
