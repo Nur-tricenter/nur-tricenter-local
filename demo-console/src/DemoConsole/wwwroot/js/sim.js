@@ -48,6 +48,11 @@ NT.sim = (function () {
   }
 
   // ---------- events + outbox ----------
+  // Visual rhythm: outbox row now -> dispatcher publishes after `delay` -> each consumer records
+  // an inbox row 400-900 ms later (a little staggered) -> the reaction runs with the first inbox row.
+  const INBOX_ROWS_FOR = ["ms2", "ms3", "ms4", "ms5"]; // services that keep an inbox table
+  const hop = () => 400 + Math.random() * 500;
+
   function publish(publisher, exchange, payload, delay = 700) {
     const def = T.eventByName[exchange];
     const row = { id: U.uid(), service: publisher, type: def ? def.type : exchange, createdAt: new Date().toISOString(), processedAt: null, payload };
@@ -56,18 +61,25 @@ NT.sim = (function () {
     setTimeout(() => {
       row.processedAt = new Date().toISOString();
       const id = U.uid();
-      NT.bus.emit("sim-event", { id, exchange, receivedAt: new Date().toISOString(), payload });
-      (def ? def.consumers : []).forEach(c => {
+      const receivedAt = new Date().toISOString();
+      NT.bus.emit("sim-event", { id, exchange, receivedAt, payload });
+      const consumers = def ? def.consumers : [];
+      let first = Infinity;
+      consumers.forEach((c, k) => {
         const q = `${c}.${exchange}`;
         queueStats[q] = queueStats[q] || { publish: 0, ack: 0 };
         queueStats[q].publish++;
-        queueStats[q].ack++;
-        if (["ms3", "ms4", "ms5"].includes(c)) {
-          inboxRows.unshift({ id, service: c, type: row.type, receivedAt: new Date().toISOString(), processedAt: new Date(Date.now() + 120).toISOString() });
+        if (!INBOX_ROWS_FOR.includes(c)) { queueStats[q].ack++; return; }
+        const wait = hop() + k * 120;
+        first = Math.min(first, wait);
+        setTimeout(() => {
+          queueStats[q].ack++;
+          const now = new Date().toISOString();
+          inboxRows.unshift({ id, service: c, type: row.type, receivedAt: now, processedAt: now, payload });
           if (inboxRows.length > 80) inboxRows.pop();
-        }
+        }, wait);
       });
-      if (reactions[exchange]) setTimeout(() => reactions[exchange](payload), 500);
+      if (reactions[exchange]) setTimeout(() => reactions[exchange](payload), isFinite(first) ? first : hop());
     }, delay);
   }
 

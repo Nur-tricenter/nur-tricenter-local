@@ -30,7 +30,7 @@
 
   --rail-w: 232px;
   --top-h: 64px;
-  --board-h: 214px;
+  --board-h: clamp(150px, 24vh, 214px);
 }
 
 * { box-sizing: border-box; }
@@ -111,6 +111,14 @@ code, pre, .mono { font-family: var(--mono); font-size: 12.5px; }
 }
 .rail a:first-child::before { top: 50%; }
 .rail a:nth-child(7)::before { bottom: 50%; }
+.rail a > span { display: block; }
+/* which assignment requirement each view proves */
+.rail .req-tag {
+  display: inline-block; margin-top: 3px; padding: 1px 7px;
+  border-radius: 999px; background: rgba(29, 43, 58, .07);
+  color: var(--ink-soft); font-size: 11px; font-weight: 400; letter-spacing: .02em;
+}
+.rail a[aria-current="page"] .req-tag { background: var(--ink); color: var(--paper); }
 .rail a:hover { background: rgba(29, 43, 58, .05); }
 .rail a[aria-current="page"] { font-weight: 700; }
 .rail a[aria-current="page"]::after { background: var(--ink); border-color: var(--ink); box-shadow: 0 0 0 4px rgba(29,43,58,.15); }
@@ -120,7 +128,10 @@ code, pre, .mono { font-family: var(--mono); font-size: 12.5px; }
 .mode-switch input { width: 16px; height: 16px; accent-color: var(--ink); }
 
 /* ---------- stage ---------- */
-.stage { grid-area: stage; overflow: auto; padding: 28px 32px 32px; outline: none; }
+.stage { grid-area: stage; min-height: 0; overflow: auto; padding: 28px 32px 32px; outline: none; }
+/* A view that fills the stage (the flow view's .pv-root) manages its own layout: no stage scroll. */
+.stage:has(> .pv-root) { overflow: hidden; padding: 14px 18px 12px; min-height: 0; }
+.stage > .pv-root { height: 100%; min-height: 0; }
 .view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
 .view-head h1 { margin: 0; font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -.005em; }
 .view-head p { margin: 6px 0 0; max-width: 68ch; color: var(--ink-soft); }
@@ -257,7 +268,9 @@ pre.json {
 
 /* ---------- live board (departure board) ---------- */
 .board { grid-area: board; border-top: 2px solid var(--ink); background: var(--ink); color: #e9eef3; display: flex; flex-direction: column; height: var(--board-h); transition: height .25s ease; }
+.board { overflow: hidden; }
 .board.collapsed { height: 40px; }
+@media (prefers-reduced-motion: reduce) { .board { transition: none; } }
 .board-head { display: flex; align-items: center; gap: 16px; padding: 0 16px; height: 40px; flex: none; font-size: 13px; }
 .board-toggle { background: none; border: 0; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; padding: 0; }
 .board-toggle::before { content: "▾ "; }
@@ -325,6 +338,7 @@ pre.json {
   .shell { grid-template-columns: 1fr; grid-template-areas: "top" "rail" "stage" "board"; grid-template-rows: auto auto 1fr auto; }
   .rail { flex-direction: row; overflow-x: auto; padding: 6px; }
   .rail a { padding: 8px 12px; white-space: nowrap; }
+  .rail .req-tag { display: none; }
   .rail a::before, .rail a::after, .rail-foot { display: none; }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .stage { padding: 18px 16px; }

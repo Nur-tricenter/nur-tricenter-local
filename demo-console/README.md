@@ -60,7 +60,34 @@ Plain HTML/CSS/JS, no build step and no CDN (works offline). Classic scripts sha
 
 - `js/config.js`, `js/bus.js`, `js/topology.js` (services, events, kernels), `js/util.js`
 - `js/api.js` (every call; emits `http` for the map), `js/sim.js`, `js/live.js` (SSE, Consul polling, board)
+- `js/inspect.js` (`NT.inspect`), `js/outboxwatch.js` (`NT.outboxWatch`), `js/canvas.js` (`NT.canvas`): see below
 - `js/views/*.js`, one per sidebar entry; `js/app.js` is the hash router
+
+### "Recorrido de un pedido" view (live flow)
+
+The guided flow runs the 11 steps of the happy path next to a live canvas. Between services there are
+no REST calls, only events, so the canvas draws the real mechanism: HTTP in through the gateway, then
+outbox row -> broker -> inbox row at each consumer. Its pieces:
+
+- **`NT.canvas`** (`js/canvas.js`, `css/canvas.css`, classes `cv-*`): `mount(el)`, `unmount()`, `reset()`,
+  `focus(svcId|null)`. Subscribes to the bus events `http`, `event`, `outbox-row`, `health` and `step`, and
+  starts `NT.outboxWatch` while mounted. One canvas at a time.
+- **`NT.inspect`** (`js/inspect.js`, classes `insp-*`): `attach(rootEl, resolve)` returns a detach function.
+  Any descendant with `data-inspect` gets a hover tooltip and a click-to-pin slide-over with the full JSON.
+  `resolve(el)` returns `null` or `{ title, subtitle?, color?, sections: [{ label, data, kind? }] }`.
+  Used by the canvas and by the system map (stations and moving trains).
+- **`NT.outboxWatch`** (`js/outboxwatch.js`): ref-counted `start()` / `stop()`. Polls `NT.api.outbox()`
+  (`NT.config.pollOutboxMs`; every 400 ms in sim mode) and emits `outbox-row`
+  `{ id, service, table: "outbox"|"inbox", type, status, at }` once per row not seen in the previous
+  poll (the first poll only primes). Errors are swallowed.
+- **`NT.live.board`**: `collapse(bool)` / `isCollapsed()` for the bottom event board; the flow view
+  collapses it while mounted.
+- Bus events added: `outbox-row` (above) and `step` `{ index, svc, title, phase: "start"|"done"|"failed" }`,
+  emitted by the flow view so the canvas can highlight the acting service.
+
+In sim mode (`js/sim.js`) every published event writes an outbox row immediately, reaches the broker
+after the dispatcher delay and lands in each consumer's inbox 400-900 ms later, so the canvas has a
+natural rhythm without the stack.
 
 ## Demo script
 
