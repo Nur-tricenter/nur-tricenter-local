@@ -71,6 +71,8 @@ dotnet build "$MS4_ROOT/src/Api/Api.csproj" -c Debug >/dev/null
 dotnet build "$MS4_ROOT/src/WorkerService/WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$MS3_ROOT/Nurtricenter.Api/Nurtricenter.MS3.Api.csproj" -c Debug >/dev/null
 dotnet build "$MS3_ROOT/Nurtricenter.MS3.WorkerService/Nurtricenter.MS3.WorkerService.csproj" -c Debug >/dev/null
+# Presentation dashboard (http://localhost:15100), lives in this repository.
+dotnet build "$(dirname "$0")/../demo-console/src/DemoConsole/DemoConsole.csproj" -c Debug >/dev/null
 
 # 2. Infra first, then make sure every database exists. Postgres runs postgres-init/ only on
 # a brand-new volume, so a volume created before a service was added lacks its database and

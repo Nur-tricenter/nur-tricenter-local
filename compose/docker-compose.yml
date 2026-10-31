@@ -95,6 +95,9 @@ include:
   # ms3-contract-and-production, cloned as a sibling like the others.
   - path: ../../ms3-contract-and-production/contracting.compose.yml
 
+  # Presentation dashboard (http://localhost:15100). Lives in this repository, not a sibling.
+  - path: ../demo-console/demo-console.compose.yml
+
 services:
   gateway:
     # The runtime tag follows THIS project's TargetFramework (net10.0): the gateway
