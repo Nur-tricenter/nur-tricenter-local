@@ -23,6 +23,7 @@ COMPOSE_INFRA_FILE="$COMPOSE_DIR/docker-compose.infra.yml"
 CATALOG_ROOT="$REPO_ROOT/../ms2-plans-and-recipes-catalog"
 GATEWAY_ROOT="$REPO_ROOT/../nur-tricenter-api-gateway"
 IDENTITY_ROOT="$REPO_ROOT/../nur-tricenter-identity"
+MS1_ROOT="$REPO_ROOT/../ms1-gestion-clinica-nutricional"
 MS4_ROOT="$REPO_ROOT/../ms4-delivery-schedule-management"
 MS3_ROOT="$REPO_ROOT/../ms3-contract-and-production"
 # ms5's folder name differs between clones; the compose include reads the same variable.
@@ -31,7 +32,7 @@ NURTRICENTER_ROOT="$REPO_ROOT/../${NURTRICENTER_REPO_DIR:-ms5-logistics-and-deli
 # 0. Make sure no stale containers are squatting the names we need.
 EXPECTED=(
     nur-tricenter-postgres nur-tricenter-rabbitmq nur-tricenter-consul
-    nur-tricenter-clinica-nutricional-api nur-tricenter-clinica-nutricional-workerservice
+    nur-tricenter-clinica-nutricional-migrate nur-tricenter-clinica-nutricional-api nur-tricenter-clinica-nutricional-workerservice
     nur-tricenter-catalog-api nur-tricenter-catalog-workerservice
     nur-tricenter-identity-migrate nur-tricenter-identity-api nur-tricenter-identity-workerservice
     nur-tricenter-delivery-calendar-migrate nur-tricenter-delivery-calendar-api nur-tricenter-delivery-calendar-workerservice
@@ -55,8 +56,7 @@ if ! docker network ls --format '{{.Name}}' | grep -qx 'nur-tricenter-net'; then
 fi
 
 # 1. Build the business projects (their output folders are bind-mounted).
-# ms1 is not built: it is not part of the stack yet (see compose/docker-compose.yml).
-echo "Building catalog, identity, ms5, gateway, delivery calendar (ms4) and contracting (ms3) ..."
+echo "Building catalog, identity, ms5, gateway, clinica nutricional (ms1), delivery calendar (ms4) and contracting (ms3) ..."
 dotnet build "$CATALOG_ROOT/src/Catalog.App/Catalog.App.csproj" -c Debug >/dev/null
 dotnet build "$CATALOG_ROOT/src/Catalog.WorkerService/Catalog.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$IDENTITY_ROOT/src/Identity.App/Identity.App.csproj" -c Debug >/dev/null
@@ -64,6 +64,8 @@ dotnet build "$IDENTITY_ROOT/src/Identity.WorkerService/Identity.WorkerService.c
 dotnet build "$NURTRICENTER_ROOT/src/Nurtricenter.Api/Nurtricenter.Api.csproj" -c Debug >/dev/null
 dotnet build "$NURTRICENTER_ROOT/src/Nurtricenter.WorkerService/Nurtricenter.WorkerService.csproj" -c Debug >/dev/null
 dotnet build "$GATEWAY_ROOT/ApiGateway.App/ApiGateway.App.csproj" -c Debug >/dev/null
+dotnet build "$MS1_ROOT/GestionClinicaNutricionalService.WebApi/GestionClinicaNutricionalService.WebApi.csproj" -c Debug >/dev/null
+dotnet build "$MS1_ROOT/GestionClinicaNutricional.WorkerService/GestionClinicaNutricional.WorkerService.csproj" -c Debug >/dev/null
 # MS4 builds into its own artifacts/ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
 dotnet build "$MS4_ROOT/src/Api/Api.csproj" -c Debug >/dev/null
 dotnet build "$MS4_ROOT/src/WorkerService/WorkerService.csproj" -c Debug >/dev/null

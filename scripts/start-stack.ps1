@@ -38,6 +38,7 @@ $composeInfraFile  = Join-Path $composeDir 'docker-compose.infra.yml'
 $catalogRoot       = Join-Path $repoRoot '..\ms2-plans-and-recipes-catalog'
 $gatewayRoot       = Join-Path $repoRoot '..\nur-tricenter-api-gateway'
 $identityRoot      = Join-Path $repoRoot '..\nur-tricenter-identity'
+$ms1Root           = Join-Path $repoRoot '..\ms1-gestion-clinica-nutricional'
 $ms4Root           = Join-Path $repoRoot '..\ms4-delivery-schedule-management'
 $ms3Root           = Join-Path $repoRoot '..\ms3-contract-and-production'
 # ms5's folder name differs between clones; the compose include reads the same variable.
@@ -51,7 +52,7 @@ $expected = @(
     # Platform
     'nur-tricenter-postgres','nur-tricenter-rabbitmq','nur-tricenter-consul',
     # Microservice processes (container_name declared in docker-compose.yml)
-    'nur-tricenter-clinica-nutricional-api','nur-tricenter-clinica-nutricional-workerservice',
+    'nur-tricenter-clinica-nutricional-migrate','nur-tricenter-clinica-nutricional-api','nur-tricenter-clinica-nutricional-workerservice',
     'nur-tricenter-catalog-api','nur-tricenter-catalog-workerservice',
     'nur-tricenter-identity-migrate','nur-tricenter-identity-api','nur-tricenter-identity-workerservice',
     'nur-tricenter-delivery-calendar-migrate','nur-tricenter-delivery-calendar-api','nur-tricenter-delivery-calendar-workerservice',
@@ -81,9 +82,8 @@ if (-not $existingNet) {
 # 1. Build the business projects on the host. The compose file
 # bind-mounts the output bin/Debug/ directories. Identity is included here
 # (it was previously a manual step) so the whole stack comes up from one command.
-# ms1 is not built: it is not part of the stack yet (see compose\docker-compose.yml).
 # Every build is checked: a failed build used to surface only as a container that never started.
-Write-Host "Building catalog, identity, ms5, gateway, delivery calendar (ms4) and contracting (ms3) ..."
+Write-Host "Building catalog, identity, ms5, gateway, clinica nutricional (ms1), delivery calendar (ms4) and contracting (ms3) ..."
 $projects = @(
     (Join-Path $catalogRoot 'src\Catalog.App\Catalog.App.csproj'),
     (Join-Path $catalogRoot 'src\Catalog.WorkerService\Catalog.WorkerService.csproj'),
@@ -92,6 +92,9 @@ $projects = @(
     (Join-Path $nurtricenterRoot 'src\Nurtricenter.Api\Nurtricenter.Api.csproj'),
     (Join-Path $nurtricenterRoot 'src\Nurtricenter.WorkerService\Nurtricenter.WorkerService.csproj'),
     (Join-Path $gatewayRoot 'ApiGateway.App\ApiGateway.App.csproj'),
+    # MS1 builds into its own bin\Debug\net10.0 folders, which ms1.compose.yml bind-mounts.
+    (Join-Path $ms1Root 'GestionClinicaNutricionalService.WebApi\GestionClinicaNutricionalService.WebApi.csproj'),
+    (Join-Path $ms1Root 'GestionClinicaNutricional.WorkerService\GestionClinicaNutricional.WorkerService.csproj'),
     # MS4 builds into its own artifacts\ folder (ArtifactsPath), which ms4.compose.yml bind-mounts.
     (Join-Path $ms4Root 'src\Api\Api.csproj'),
     (Join-Path $ms4Root 'src\WorkerService\WorkerService.csproj'),
@@ -213,6 +216,7 @@ Write-Host "  - Consul UI:    http://localhost:8500"
 Write-Host "  - RabbitMQ UI:  http://localhost:15672  (guest / guest)"
 Write-Host "  - Gateway:      http://localhost:15005"
 Write-Host "  - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)"
+Write-Host "  - Clinica nutricional (ms1): internal only (through the gateway as /api/clinica-nutricional/v1/...)"
 Write-Host "  - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)"
 Write-Host "  - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)"
 Write-Host "    (uses its own Neon database: ConnectionStrings__DefaultConnection in $nurtricenterRoot\.env)"

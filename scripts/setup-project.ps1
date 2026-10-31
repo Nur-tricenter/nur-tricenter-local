@@ -45,7 +45,7 @@ $workspace = Split-Path -Parent $repoRoot
 $selfRepo = 'https://github.com/Nur-tricenter/nur-tricenter-local.git'
 
 $repositories = @(
-    @{ Name = 'ms1-clinica-nutricional'; Url = 'https://github.com/Juandcode/ClinicaNutricionalMicroservicio1.git' }
+    @{ Name = 'ms1-gestion-clinica-nutricional'; Url = 'https://github.com/Nur-tricenter/ms1-gestion-clinica-nutricional.git' }
     @{ Name = 'ms2-plans-and-recipes-catalog'; Url = 'https://github.com/Nur-tricenter/ms2-plans-and-recipes-catalog.git' }
     @{ Name = 'nur-tricenter-identity';         Url = 'https://github.com/Nur-tricenter/nur-tricenter-identity.git' }
     @{ Name = 'nur-tricenter-api-gateway';       Url = 'https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git' }

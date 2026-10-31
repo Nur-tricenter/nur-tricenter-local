@@ -42,7 +42,7 @@ repo_root="$(dirname "$script_dir")"
 workspace="$(dirname "$repo_root")"
 
 repositories=(
-  "ms1-clinica-nutricional|https://github.com/Juandcode/ClinicaNutricionalMicroservicio1.git"
+  "ms1-gestion-clinica-nutricional|https://github.com/Nur-tricenter/ms1-gestion-clinica-nutricional.git"
   "ms2-plans-and-recipes-catalog|https://github.com/Nur-tricenter/ms2-plans-and-recipes-catalog.git"
   "nur-tricenter-identity|https://github.com/Nur-tricenter/nur-tricenter-identity.git"
   "nur-tricenter-api-gateway|https://github.com/Nur-tricenter/nur-tricenter-api-gateway.git"

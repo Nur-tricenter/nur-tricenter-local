@@ -45,6 +45,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nur_tricenter_identit
 SELECT 'CREATE DATABASE ms4_delivery_calendar'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms4_delivery_calendar')\gexec
 
+-- MS1 (clinica nutricional). Underscored for the same reason as MS4.
+SELECT 'CREATE DATABASE ms1_clinica_nutricional'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ms1_clinica_nutricional')\gexec
+
 -- MS3 (contracting and production). The API also creates it on its first migration when the
 -- volume predates this line.
 SELECT 'CREATE DATABASE nur_tricenter_contracting'
