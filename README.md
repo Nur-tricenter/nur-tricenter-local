@@ -446,11 +446,13 @@ cloned by `setup-project` as `ms3-contract-and-production`. Included from
 - Uses the platform Postgres, database `nur_tricenter_contracting` (created by `01-create-databases.sql`;
   the API also creates it on its first migration).
 - Registers in Consul as `contracting`: `curl http://localhost:15005/api/contracting/v1/sim/patients/<ms1-patient-id>`
-  (patients come from MS1 through `Clinic__BaseUrl`; the 3 simulated ones are only used when it is unset).
-- Consumes `ms3.meal-plan-published`, `ms3.recipe-published` and `ms3.recipe-updated` (catalog).
-- Calls MS4 through the gateway as service account `ms3-service` (created by `start-stack`):
-  `POST /api/delivery-calendar/v1/schedule` after a payment (from its outbox, idempotent by `contractId`) and
-  `GET /api/delivery-calendar/v1/calendars/active-tomorrow` for the daily production order.
+  (patients come from its projection of MS1's `paciente-published` when `Projections__Enabled=true`, as on the
+  platform; the 3 simulated ones are only used when it is unset).
+- Consumes `ms3.meal-plan-published`, `ms3.recipe-published` and `ms3.recipe-updated` (catalog),
+  `ms3.paciente-published` (MS1 patients) and `ms3.production-order-ready` (MS4's next-day deliveries, used by
+  daily-order, labels and validation).
+- Makes no REST call to any service. After a payment its outbox publishes `contract-activated`
+  (→ `ms4.contract-activated`, MS4 creates the calendar, idempotent by `contractId`).
 - Publishes `package-validated` (→ `ms5.package-validated`). Contract: `Nur.Tricenter.Integration.Messages.Contracting`.
 
 ### ms1 (clinica nutricional)
@@ -487,12 +489,15 @@ python scripts/e2e-smoke.py --fail             # same, but the delivery fails
 python scripts/e2e-smoke.py <ms1-patient-id>   # reuse a patient that already exists in MS1
 ```
 
-MS3 reads patients from MS1 (`Clinic__BaseUrl`), so the script first registers a patient in MS1 and
-checks that MS3 rejects an unknown one (404). It creates a plan in MS2, contracts and pays it in MS3 (which creates the MS4 calendar), sets the
-address and resolves tomorrow's menu in MS4, builds and validates the package in MS3, and lets MS5
+There is no REST between services, so the script waits (and retries) for each projection: it registers a
+patient in MS1 (MS3 projects it from `paciente-published`) and checks that MS3 rejects an unknown one (404). It
+creates a plan in MS2, contracts and pays it in MS3 (which publishes `contract-activated`; MS4 creates the calendar),
+sets the address and resolves tomorrow's menu in MS4 (from its projection of MS2's composition, retrying until it
+arrives), waits for MS3 to project MS4's `production-order-ready`, builds and validates the package in MS3, and lets MS5
 receive it (`package-validated`) into **tomorrow's** route (the message's `DeliveryDate`), deliver it
 and report back (`delivery-*`) until MS4 closes the day. It needs MS3, MS4 and MS5 built with
-`Nur.Tricenter.Integration` 1.4.0: MS4 links the MS5 delivery to its day by `DeliveryDayId`. Dates are
+`Nur.Tricenter.Integration` 1.6.0 (MS4 links the MS5 delivery to its day by `DeliveryDayId`; 1.6.0 adds
+`ContractActivated`, `ProductionOrderReady`, `MealPlanCompositionChanged` and `PatientPublished`). Dates are
 taken in UTC, like the services, so the script also works after 20:00 Bolivia time.
 
 ### Notes
@@ -502,7 +507,8 @@ taken in UTC, like the services, so the script also works after 20:00 Bolivia ti
   assembly — rebuild the project before restarting.
 - `start-stack` builds every included service (and stops on the first failed build), starts the
   infrastructure, creates any missing service database (Postgres runs `postgres-init/` only on a
-  brand-new volume), then starts the services and creates the `ms3-service`/`ms4-service` accounts,
+  brand-new volume), then starts the services and creates the `ms3-service`/`ms4-service` accounts (no service logs in with them any
+  more; the demo console's security view does),
   so a fresh clone comes up from a single command after `setup-project`.
 - The gateway is the only service always mapped to a host port (sole public entry point). The catalog's
   `18080 → 8080` is dev-only.

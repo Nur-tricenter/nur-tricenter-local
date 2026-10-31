@@ -38,7 +38,7 @@ NT.views.flujo = (function () {
         expect(r, [200], "Login");
         note(`Token emitido para admin con ${U.claimScopes(api.claims).length} scopes. Todas las llamadas siguientes lo envían en Authorization: Bearer.`);
       } },
-    { svc: "ms1", title: "Registrar paciente", desc: "MS1 guarda al paciente y publica paciente-published por su outbox.",
+    { svc: "ms1", title: "Registrar paciente", desc: "MS1 guarda al paciente y publica paciente-published por su outbox; MS3 lo proyecta.",
       async run(c) {
         c.stamp = U.stamp();
         const r = await api.call("ms1", "POST", "/Patient/CreatePaciente", { body: { ci: `DEMO${c.stamp}`, nombre: "Ana", apellido: `Demo ${c.stamp}`, telefono: "+591 700 55555" } });
@@ -46,7 +46,7 @@ NT.views.flujo = (function () {
         c.patientId = v.value;
         expect(await api.call("ms1", "GET", `/Patient/${c.patientId}`), [200], "Leer paciente");
       } },
-    { svc: "ms2", title: "Crear recetas y plan de 15 días", desc: "MS2 publica recipe-published y meal-plan-published; MS3 y MS4 los proyectan.",
+    { svc: "ms2", title: "Crear recetas y plan de 15 días", desc: "MS2 publica recipe-published, meal-plan-published y meal-plan-composition-changed; MS3 y MS4 los proyectan.",
       async run(c) {
         c.recipes = [];
         for (const name of ["Majadito", "Sopa de maní"]) {
@@ -68,20 +68,20 @@ NT.views.flujo = (function () {
           const r = await api.call("ms2", "GET", `/meal-plans/${c.planId}`, { quiet: true });
           return r.status === 200 && r.response.data.days[0].mealTimes.reduce((n, m) => n + m.recipes.length, 0) >= 2;
         }, 60000);
-        note("Plan listo. El evento meal-plan-published ya viajó a MS3 y MS4 por RabbitMQ.");
+        note("Plan listo. meal-plan-published viajó a MS3 y MS4; cada receta asignada publicó meal-plan-composition-changed con el plan completo, y MS4 lo guardó como proyección.");
       } },
-    { svc: "ms3", title: "Contratar y cobrar", desc: "MS3 acepta el contrato cuando ya recibió el plan por evento, y valida al paciente contra MS1.",
+    { svc: "ms3", title: "Contratar y cobrar", desc: "MS3 acepta el contrato cuando ya proyectó el plan y el paciente a partir de eventos. No llama a MS1 ni a MS2.",
       async run(c) {
-        const r = await poll("que MS3 conozca el plan (meal-plan-published)", async () => {
+        const r = await poll("que MS3 conozca el plan y el paciente (meal-plan-published y paciente-published)", async () => {
           const x = await api.call("ms3", "POST", "/contracts", { body: { patientId: c.patientId, catalogPlanId: c.planId }, quiet: true });
           return x.status === 201 ? x : null;
         }, 90000, 3000);
         NT.bus.emit("http", Object.assign({}, r, { quiet: false }));
         c.contractId = r.response.id;
         expect(await api.call("ms3", "POST", "/billing/charge-plan", { body: { contractId: c.contractId, amount: 150.0, invoiceNumber: `inv-demo-${c.stamp}` } }), [200, 201], "Cobro");
-        note("Pagado. El worker de MS3 llama a MS4 POST /schedule con la cuenta de servicio ms3-service.");
+        note("Pagado. El worker de MS3 publica contract-activated desde su outbox; MS4 lo consume y crea el calendario. No hay llamada REST entre los dos.");
       } },
-    { svc: "ms4", title: "Calendario de entregas creado", desc: "MS4 recibió el pedido de MS3 y creó 15 días pendientes.",
+    { svc: "ms4", title: "Calendario de entregas creado", desc: "MS4 consumió contract-activated y creó 15 días pendientes.",
       async run(c) {
         const found = await poll("el calendario del contrato en MS4", () => api.lookup("calendar-by-contract", c.contractId), 60000);
         c.calendarId = found.calendarId;
@@ -91,14 +91,19 @@ NT.views.flujo = (function () {
         c.deliveryDate = first.date;
         note(`Calendario ${c.calendarId} con ${cal.days.length} días. El día 1 (${first.date}) es mañana en UTC.`);
       } },
-    { svc: "ms4", title: "Dirección y menú de mañana", desc: "El paciente registra la dirección; MS4 resuelve el menú pidiéndolo a MS2.",
+    { svc: "ms4", title: "Dirección y menú de mañana", desc: "El paciente registra la dirección; MS4 resuelve el menú con su proyección del plan de MS2 y publica production-order-ready.",
       async run(c) {
         expect(await api.call("ms4", "POST", `/calendars/${c.calendarId}/addresses`, { body: { dayId: c.dayId, street: "Av. Banzer 123", city: "Santa Cruz", latitude: -17.78, longitude: -63.18, references: "Portón verde", notes: null } }), [200, 201], "Dirección");
-        expect(await api.call("ms4", "POST", `/calendars/resolve-daily-catalog?date=${c.deliveryDate}`), [200, 204], "Resolver menú");
-        const at = expect(await api.call("ms4", "GET", `/calendars/active-tomorrow?date=${c.deliveryDate}`), [200], "Pedidos de mañana");
-        const mine = (at || []).find(x => x.packId === c.dayId);
-        if (!mine) throw new Error("El día no aparece en active-tomorrow");
-        note(`Menú resuelto: ${(mine.menu || []).map(m => U.pick(m, "recipeName") || U.pick(m, "name")).filter(Boolean).join(", ") || "sin recetas"}.`);
+        // The menu comes from MS4's projection of meal-plan-composition-changed (asynchronous), so an early
+        // run leaves the day Scheduled. The job is idempotent: rerun it until the day has its menu.
+        const mine = await poll("que MS4 resuelva el menú del día con la composición que publicó MS2", async () => {
+          const r = await api.call("ms4", "POST", `/calendars/resolve-daily-catalog?date=${c.deliveryDate}`, { quiet: true });
+          if (![200, 204].includes(r.status)) return null;
+          const a = await api.call("ms4", "GET", `/calendars/active-tomorrow?date=${c.deliveryDate}`, { quiet: true });
+          const day = a.status === 200 ? (a.response || []).find(x => x.packId === c.dayId) : null;
+          return day && (day.menu || []).length ? day : null;
+        }, 90000, 3000);
+        note(`Menú resuelto: ${(mine.menu || []).map(m => U.pick(m, "recipeName") || U.pick(m, "name")).filter(Boolean).join(", ") || "sin recetas"}. MS4 publicó production-order-ready con la orden completa; MS3 la proyecta.`);
       } },
     { svc: "ms5", title: "Repartidor y ruta de mañana", desc: "MS5 crea el repartidor y su ruta; publica courier-created y route-created.",
       async run(c) {
@@ -107,8 +112,10 @@ NT.views.flujo = (function () {
         const r = expect(await api.call("ms5", "POST", "/routes", { body: { courierId: c.courierId, scheduledDate: c.deliveryDate } }), [200, 201], "Ruta");
         c.routeId = r.id;
       } },
-    { svc: "ms3", title: "Producir y validar el paquete", desc: "MS3 arma la orden del día, empaqueta, etiqueta y valida. Publica package-validated.",
+    { svc: "ms3", title: "Producir y validar el paquete", desc: "MS3 arma la orden del día con lo que proyectó de production-order-ready, empaqueta, etiqueta y valida. Publica package-validated.",
       async run(c) {
+        // MS3 builds the order from its projection of MS4's production-order-ready: wait until it holds this day.
+        await poll("que MS3 proyecte production-order-ready de MS4 con este día", () => api.lookup("scheduled-delivery-by-day", c.dayId), 60000, 2000);
         const o = expect(await api.call("ms3", "GET", `/production/daily-order?productionDate=${c.deliveryDate}`), [200], "Orden de producción");
         c.productionOrderId = o.productionOrderId;
         const p = expect(await api.call("ms3", "POST", "/production/packages", { body: { productionOrderId: c.productionOrderId, patientId: c.patientId, catalogPlanId: c.planId } }), [200, 201], "Paquete");

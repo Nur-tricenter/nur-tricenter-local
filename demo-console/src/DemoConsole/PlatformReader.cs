@@ -10,7 +10,7 @@ public sealed class PlatformReader(IConfiguration config, ILogger<PlatformReader
 {
     public sealed record MessageRow(string Id, string Service, string Type, DateTimeOffset? CreatedAt, DateTimeOffset? ProcessedAt, string? Status);
 
-    // Joseco.Outbox table (identity, MS1, MS2, MS5) and MS3's own table.
+    // Joseco.Outbox table (identity, MS1, MS2, MS5), MS3's own table and MS4's own table.
     private static readonly string[] JosecoOutbox = ["identity", "ms1", "ms2", "ms5"];
     private static readonly string[] Inbox = ["ms2", "ms3", "ms4", "ms5"];
 
@@ -22,6 +22,10 @@ public sealed class PlatformReader(IConfiguration config, ILogger<PlatformReader
         select "Id"::text, "EventType", "CreatedAt", "PublishedAt", "Status"
         from "OutgoingIntegrationEvents" order by "CreatedAt" desc limit @n
         """;
+    private const string Ms4OutboxSql = """
+        select "Id"::text, "Type", "CreatedAt", "PublishedAt", case when "PublishedAt" is null then 'Pending' else 'Processed' end
+        from "OutboxMessages" order by "CreatedAt" desc limit @n
+        """;
     private const string InboxSql = """
         select "MessageId"::text, "MessageType", "MessageCreatedAt", "ProcessedOn", null
         from {0}"InboxMessages" order by coalesce("ProcessedOn", "MessageCreatedAt") desc limit @n
@@ -31,7 +35,8 @@ public sealed class PlatformReader(IConfiguration config, ILogger<PlatformReader
     {
         const int n = 25;
         var outTasks = JosecoOutbox.Select(s => QueryRowsAsync(s, JosecoSql, n, ct))
-            .Append(QueryRowsAsync("ms3", Ms3OutboxSql, n, ct));
+            .Append(QueryRowsAsync("ms3", Ms3OutboxSql, n, ct))
+            .Append(QueryRowsAsync("ms4", Ms4OutboxSql, n, ct));
         var inTasks = Inbox.Select(s => QueryRowsAsync(s, string.Format(InboxSql, s == "ms2" ? "read." : ""), n, ct));
 
         var outbox = (await Task.WhenAll(outTasks)).SelectMany(x => x).OrderByDescending(r => r.CreatedAt).Take(60);
@@ -93,6 +98,18 @@ public sealed class PlatformReader(IConfiguration config, ILogger<PlatformReader
         while (await reader.ReadAsync(ct))
             list.Add(new { packageId = reader.GetGuid(0), patientId = reader.GetGuid(1), status = reader.GetString(2) });
         return list;
+    }
+
+    /// <summary>
+    /// The MS3 projection row of an MS4 delivery day (from <c>production-order-ready</c>). No service exposes it,
+    /// so the flow reads it here to know MS3 holds the day before it builds the daily order.
+    /// </summary>
+    public async Task<object?> ScheduledDeliveryByDayAsync(int dayId, CancellationToken ct)
+    {
+        await using var conn = await OpenAsync("ms3", ct);
+        await using var cmd = new NpgsqlCommand("""select "DeliveryDate" from "ScheduledDeliveries" where "DeliveryDayId" = @id""", conn);
+        cmd.Parameters.AddWithValue("id", dayId);
+        return await cmd.ExecuteScalarAsync(ct) is { } date ? new { deliveryDayId = dayId, deliveryDate = date } : null;
     }
 
     public async Task<object?> DeliveryByDayAsync(int dayId, CancellationToken ct)

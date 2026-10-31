@@ -21,7 +21,7 @@ NT.sim = (function () {
   };
 
   const db = {
-    patients: {}, recipes: {}, plans: {}, ms3Plans: new Set(), contracts: {},
+    patients: {}, recipes: {}, plans: {}, ms3Plans: new Set(), ms3Patients: new Set(), ms4Menus: {}, ms3Deliveries: {}, contracts: {},
     calendars: {}, nextCalendar: 41, nextDay: 900, orders: {}, packages: {},
     couriers: {}, routes: {}, deliveries: {}, links: {}, nextDelivery: 300
   };
@@ -71,11 +71,13 @@ NT.sim = (function () {
     }, delay);
   }
 
-  function rest(from, to, label) { NT.bus.emit("rest", { from, to, label }); }
-
   // What consumers do when an event reaches them.
   const reactions = {
     "meal-plan-published": p => { db.ms3Plans.add(p.PlanId); },
+    "paciente-published": p => { db.ms3Patients.add(p.PatientId); },
+    "meal-plan-composition-changed": p => { db.ms4Menus[p.PlanId] = p.Days; },
+    "contract-activated": p => createCalendar({ id: p.ContractId, patientId: p.PatientId, planId: p.CatalogPlanId }),
+    "production-order-ready": p => { db.ms3Deliveries[p.DeliveryDate] = p.Lines; },
     "package-validated": p => {
       const route = Object.values(db.routes).find(r => r.scheduledDate === p.DeliveryDate);
       if (!route) return;
@@ -155,7 +157,7 @@ NT.sim = (function () {
         if (route === "/Patient/CreatePaciente") {
           const id = U.uid();
           db.patients[id] = Object.assign({ id }, body);
-          publish("ms1", "paciente-published", { PacienteId: id, CI: body.ci, Nombre: body.nombre, Apellido: body.apellido });
+          publish("ms1", "paciente-published", { PatientId: id, DocumentNumber: body.ci, FirstName: body.nombre, LastName: body.apellido, Phone: body.telefono || null });
           return ok({ isSuccess: true, value: id });
         }
         if (seg[0] === "Patient" && method === "GET") {
@@ -186,6 +188,12 @@ NT.sim = (function () {
           const plan = db.plans[body.mealPlanId];
           const mt = plan.days[0].mealTimes.find(m => m.mealTimeId === body.mealTimeId);
           body.recipes.forEach(r => mt.recipes.push({ recipeId: r.recipeId, name: db.recipes[r.recipeId].name, rationQuantity: r.rationQuantity }));
+          publish("ms2", "meal-plan-composition-changed", {
+            PlanId: plan.id,
+            Days: plan.days.map(d => ({ DayNumber: d.dayNumber, MealTimes: d.mealTimes.map(m => ({
+              Name: m.mealTimeType === 3 ? "Almuerzo" : "Cena", Order: m.mealTimeType,
+              Recipes: m.recipes.map(r => ({ RecipeId: r.recipeId, RecipeName: r.name, Rations: r.rationQuantity })) })) }))
+          });
           return ok({ data: true });
         }
         if (seg[0] === "meal-plans" && method === "GET") {
@@ -196,8 +204,7 @@ NT.sim = (function () {
       }
       case "ms3": {
         if (route === "/contracts") {
-          if (!db.patients[body.patientId]) return problem(404, "Paciente no existe en MS1");
-          rest("ms3", "ms1", "GET paciente");
+          if (!db.ms3Patients.has(body.patientId)) return problem(404, "Paciente aún no proyectado en MS3", "Esperando paciente-published");
           if (!db.ms3Plans.has(body.catalogPlanId)) return problem(404, "Plan aún no proyectado en MS3", "Esperando meal-plan-published");
           const id = U.uid();
           db.contracts[id] = { id, patientId: body.patientId, planId: body.catalogPlanId, status: "Created" };
@@ -206,15 +213,16 @@ NT.sim = (function () {
         if (route === "/billing/charge-plan") {
           const c = db.contracts[body.contractId];
           c.status = "Active";
-          setTimeout(() => createCalendar(c), 900);
+          publish("ms3", "contract-activated", { ContractId: c.id, PatientId: c.patientId, CatalogPlanId: c.planId, DurationDays: 15, StartDate: U.utcDate(1) }, 900);
           return ok({ invoiceNumber: body.invoiceNumber, amount: body.amount, status: "Paid" });
         }
         if (route === "/production/daily-order") {
           const date = qs.get("productionDate");
-          rest("ms3", "ms4", "GET active-tomorrow");
+          const lines = db.ms3Deliveries[date];
+          if (!lines || !lines.length) return problem(404, "Sin calendarios", "NO_CALENDARS: MS3 aún no recibió production-order-ready");
           let order = Object.values(db.orders).find(o => o.date === date);
           if (!order) { order = { id: U.uid(), date, packages: [] }; db.orders[order.id] = order; }
-          return ok({ productionOrderId: order.id, productionDate: date, lines: activeTomorrow(date) });
+          return ok({ productionOrderId: order.id, productionDate: date, lines });
         }
         if (route === "/production/packages") {
           const order = db.orders[body.productionOrderId];
@@ -251,14 +259,24 @@ NT.sim = (function () {
           let resolved = 0;
           Object.values(db.calendars).forEach(c => c.days.forEach(d => {
             if (d.date === date && d.status === "Scheduled") {
-              rest("ms4", "ms2", "GET meal-plans/{id}");
-              const plan = db.plans[c.planId];
-              d.menu = plan.days[0].mealTimes.map(m => ({ mealTime: m.mealTimeType === 3 ? "Almuerzo" : "Cena", recipeName: (m.recipes[0] || {}).name, rations: 1 }));
-              d.portions = d.menu.length;
+              // Menus come from MS4's own projection of meal-plan-composition-changed; no snapshot yet, no menu.
+              const planDay = (db.ms4Menus[c.planId] || []).find(x => x.DayNumber === d.dayNumber);
+              const items = planDay ? planDay.MealTimes.flatMap(m => m.Recipes.map(r => ({ mealTime: m.Name, mealTimeOrder: m.Order, recipeId: r.RecipeId, recipeName: r.RecipeName, rations: r.Rations }))) : [];
+              if (!items.length) return;
+              d.menu = items;
+              d.portions = items.reduce((n, i) => n + i.rations, 0);
               d.status = "ReadyForProduction";
               resolved++;
             }
           }));
+          const lines = [];
+          Object.values(db.calendars).forEach(c => c.days.forEach(d => {
+            if (d.date === date && d.status === "ReadyForProduction" && d.address)
+              lines.push({ DeliveryDayId: d.id, PatientId: c.patientId, PlanId: c.planId, Hour: null, Address: `${d.address.street}, ${d.address.city}`,
+                Latitude: d.address.latitude, Longitude: d.address.longitude,
+                Menu: d.menu.map(m => ({ MealTime: m.mealTime, MealTimeOrder: m.mealTimeOrder, RecipeId: m.recipeId, RecipeName: m.recipeName, Rations: m.rations })) });
+          }));
+          publish("ms4", "production-order-ready", { ProductionOrderId: 1, DeliveryDate: date, ProductionDate: U.utcDate(0), Lines: lines });
           return ok({ date, resolvedDays: resolved });
         }
         if (route === "/calendars/active-tomorrow") return ok(activeTomorrow(qs.get("date")));
@@ -320,7 +338,6 @@ NT.sim = (function () {
   }
 
   function createCalendar(contract) {
-    rest("ms3", "ms4", "POST /schedule (ms3-service)");
     const id = db.nextCalendar++;
     const days = Array.from({ length: 15 }, (_, i) => ({
       id: db.nextDay++, dayNumber: i + 1, date: U.utcDate(i + 1), status: "Pending", address: null, menu: [], portions: 0
@@ -371,6 +388,10 @@ NT.sim = (function () {
     if (kind === "packages-by-order") {
       const o = db.orders[id];
       return Promise.resolve(o ? o.packages.map(p => ({ packageId: p, patientId: db.packages[p].patientId, status: db.packages[p].status })) : []);
+    }
+    if (kind === "scheduled-delivery-by-day") {
+      const held = Object.keys(db.ms3Deliveries).find(date => db.ms3Deliveries[date].some(l => l.DeliveryDayId === Number(id)));
+      return Promise.resolve(held ? { deliveryDayId: Number(id), deliveryDate: held } : null);
     }
     if (kind === "delivery-by-day") {
       const d = db.links[id];

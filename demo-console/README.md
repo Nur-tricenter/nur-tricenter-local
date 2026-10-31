@@ -13,7 +13,7 @@ The UI text is in Spanish (it is shown to the jury); code and docs are in Englis
 | Identidad y seguridad | Endpoint security: 401 / 403 / 2xx with different accounts | identity login + secured endpoints |
 | Registro de servicios | Service discovery | Consul HTTP API |
 | Eventos del broker | Asynchronous communication through RabbitMQ | event tap (SSE) + RabbitMQ management API |
-| Outbox transaccional | Transactional outbox + inbox deduplication | outbox/inbox tables (read-only SQL) |
+| Outbox transaccional | Transactional outbox + inbox deduplication | outbox/inbox tables (read-only SQL; MS4's own `OutboxMessages` included) |
 | Requisitos del proyecto | The assignment checklist, linked to each view | static |
 
 A permanent "Eventos en vivo" board at the bottom lists every integration event as it crosses the broker.

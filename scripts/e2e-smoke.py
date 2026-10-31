@@ -2,10 +2,12 @@
 
 Walks one patient through every service, always through the gateway:
 
-  MS2 recipes + plan (meal-plan-published -> MS3, MS4)
-  -> MS3 contract + payment -> MS3 worker -> MS4 POST /schedule
-  -> MS4 address + resolve-daily-catalog (MS4 -> MS2) -> active-tomorrow
-  -> MS3 daily-order (MS3 -> MS4) + package assemble/label/validate
+  MS1 patient (paciente-published -> MS3)
+  MS2 recipes + plan (meal-plan-published -> MS3, MS4; meal-plan-composition-changed -> MS4)
+  -> MS3 contract + payment -> MS3 worker -> contract-activated -> MS4 creates the calendar
+  -> MS4 address + resolve-daily-catalog (menus from MS4's own projection of MS2's composition)
+     -> production-order-ready -> MS3 projects it (active-tomorrow stays as a read for the frontend)
+  -> MS3 daily-order + package assemble/label/validate
   -> package-validated -> MS5 adds the delivery to the route of its delivery date (tomorrow)
   -> delivery-added-to-route -> MS4 links the delivery to the day
   -> MS5 deliver (or --fail) -> delivery-completed/failed -> MS4 closes the day
@@ -13,9 +15,13 @@ Walks one patient through every service, always through the gateway:
 Usage:
   python scripts/e2e-smoke.py [patientId] [--fail]
 
-With no patientId it registers a fresh patient in MS1 first (MS3 reads patients from MS1 through
-`Clinic__BaseUrl`). A patientId you pass must already exist in MS1. Against an MS3 without
-`Clinic__BaseUrl` (simulated patients) pass one of 00000000-0000-0000-0000-00000000000{1,2,3}.
+There is no service-to-service REST: everything between services is an event, so the script waits (and
+retries) for each projection: MS3 knowing the patient and the plan, MS4 having the plan's menu, MS3 having
+the production order.
+
+With no patientId it registers a fresh patient in MS1 first (MS3 projects it from `paciente-published`).
+A patientId you pass must have been published by MS1 after MS3 started (there is no backfill). Against an
+MS3 without `Projections__Enabled` (simulated patients) pass one of 00000000-0000-0000-0000-00000000000{1,2,3}.
 A few lookups read the databases through `docker exec nur-tricenter-postgres psql`, because no
 service exposes them (e.g. which MS4 calendar a contract produced). Exit code 0 = all green.
 
@@ -128,21 +134,21 @@ def main():
         len(m["recipes"]) for m in r[1]["data"]["days"][0]["mealTimes"]) == 2)(
         call("GET", f"/api/catalog/v1/meal-plans/{plan}", token=tok, quiet=True)), timeout=60)
 
-    print("== MS3: wait for the plan projection, contract, pay")
-    contract = wait("MS3 knows the plan (meal-plan-published)", lambda: (
+    print("== MS3: wait for the plan and patient projections, contract, pay")
+    contract = wait("MS3 knows the plan (meal-plan-published) and the patient (paciente-published)", lambda: (
         lambda c: c[1]["id"] if c[0] == 201 else None)(
         call("POST", "/api/contracting/v1/contracts", {"patientId": patient, "catalogPlanId": plan}, quiet=True)))
     if not contract:
         FAILS.append("aborted")
         return
-    # The plan is known to MS3 by now, so a 404 here can only be the patient lookup in MS1.
+    # The plan is known to MS3 by now, so a 404 here can only be the patient lookup (MS3's projection).
     code, _ = call("POST", "/api/contracting/v1/contracts",
                    {"patientId": "ffffffff-0000-0000-0000-00000000dead", "catalogPlanId": plan}, ok=(404,), quiet=True)
     check("MS3 rejects a patient MS1 does not have (404)", code == 404)
     call("POST", "/api/contracting/v1/billing/charge-plan",
          {"contractId": contract, "amount": 150.0, "invoiceNumber": f"inv-e2e-{stamp}"})
 
-    print("== MS4: calendar created by MS3's worker")
+    print("== MS4: calendar created from MS3's contract-activated event")
     cal = wait("MS4 calendar for the contract", lambda: sql(
         "ms4_delivery_calendar", f"select \"Id\" from \"DeliveryCalendars\" where \"ContractId\"='{contract}'"))
     if not cal:
@@ -157,17 +163,31 @@ def main():
     call("POST", f"/api/delivery-calendar/v1/calendars/{cal}/addresses",
          {"dayId": day_id, "street": "Av. Banzer 123", "city": "Santa Cruz", "latitude": -17.78,
           "longitude": -63.18, "references": "porton verde", "notes": None}, tok)
-    call("POST", f"/api/delivery-calendar/v1/calendars/resolve-daily-catalog?date={tomorrow}", token=tok)
-    _, at = call("GET", f"/api/delivery-calendar/v1/calendars/active-tomorrow?date={tomorrow}", token=tok)
-    mine = [x for x in at if x["packId"] == day_id]
-    check("active-tomorrow lists the day with its menu", bool(mine) and bool(mine[0].get("menu")))
+
+    # MS4 resolves menus from its projection of MS2's meal-plan-composition-changed events (one per
+    # assignment, delivered asynchronously), so an early run leaves the day Scheduled. The job is
+    # idempotent: rerun it until the day shows up in active-tomorrow with its menu.
+    def day_with_menu():
+        call("POST", f"/api/delivery-calendar/v1/calendars/resolve-daily-catalog?date={tomorrow}", token=tok, quiet=True)
+        code, at = call("GET", f"/api/delivery-calendar/v1/calendars/active-tomorrow?date={tomorrow}", token=tok, quiet=True)
+        mine = [x for x in at if x["packId"] == day_id] if code == 200 else []
+        return mine[0] if mine and mine[0].get("menu") else None
+
+    check("active-tomorrow lists the day with its menu (MS4 projected MS2's composition)",
+          wait("day resolved with its menu", day_with_menu, timeout=90) is not None)
 
     # MS3 produces for tomorrow and PackageValidated carries that DeliveryDate, so the route is tomorrow's.
     print("== MS5: courier + tomorrow's route (must exist before the package arrives)")
     _, courier = call("POST", "/api/nurtricenter/v1/couriers", {"fullName": f"Repartidor {stamp}"})
     _, route = call("POST", "/api/nurtricenter/v1/routes", {"courierId": courier["id"], "scheduledDate": tomorrow.isoformat()})
 
-    print("== MS3: production order, package, assemble, label, validate")
+    print("== MS3: production order (from MS4's production-order-ready), package, assemble, label, validate")
+    # MS3 builds the daily order from its projection of MS4's event; wait until that projection holds
+    # THIS day (an earlier run may have projected tomorrow without it).
+    if not wait("MS3 projected the production order with the day", lambda: sql(
+            "nur_tricenter_contracting", f"select 1 from \"ScheduledDeliveries\" where \"DeliveryDayId\"={day_id}")):
+        FAILS.append("aborted")
+        return
     _, order = call("GET", f"/api/contracting/v1/production/daily-order?productionDate={tomorrow}")
     if not isinstance(order, dict) or "productionOrderId" not in order:
         FAILS.append("aborted")
