@@ -430,12 +430,19 @@ cloned by `setup-project` as `ms3-contract-and-production`. Included from
   `GET /api/delivery-calendar/v1/calendars/active-tomorrow` for the daily production order.
 - Publishes `package-validated` (→ `ms5.package-validated`). Contract: `Nur.Tricenter.Integration.Messages.Contracting`.
 
-### ms1 (clinica nutricional) — not in the stack yet
+### ms1 (clinica nutricional)
 
-`setup-project` clones it, but it is neither included in the compose file nor built by `start-stack`:
-its repository has no platform fragment (`ms1.compose.yml`), and the service is not platform-ready
-yet (SQL Server with a hard-coded connection string, no Consul registration, no JWT). Add the
-include and the two builds back once that fragment exists.
+Repository `ms1-gestion-clinica-nutricional` (Nur-tricenter), cloned by `setup-project` as a sibling.
+`start-stack` builds its API and worker, and `ms1.compose.yml` adds a `--migrate` job, the API and the
+outbox worker on the shared network. Database `ms1_clinica_nutricional` on the platform Postgres.
+
+- Registers in Consul as `clinica-nutricional`; the gateway serves it at `/api/clinica-nutricional/v1/...`.
+- Every endpoint needs a bearer JWT from identity (there are no MS1 scopes yet, so any valid token works).
+- Publishes `paciente-published` (nobody consumes it yet) and serves `POST /api/v1/patients/contact-information`,
+  the call MS5 used to make.
+
+This needs the MS1 branch that adds `ms1.compose.yml` (Postgres, JWT, Consul): earlier checkouts of the
+repository do not have it.
 
 ### Verify
 
