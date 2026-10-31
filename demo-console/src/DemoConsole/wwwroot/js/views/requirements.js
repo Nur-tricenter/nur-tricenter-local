@@ -8,8 +8,7 @@ NT.views.requisitos = (function () {
     { title: "Integración de los microservicios del diplomado", state: "ok", text: "El recorrido de un pedido atraviesa MS1, MS2, MS3, MS4 y MS5. Entre servicios no hay REST: solo eventos por RabbitMQ; el navegador entra por el gateway.", link: "#flujo", cta: "Recorrer un pedido" },
     { title: "Seguridad en los endpoints", state: "partial", text: "JWT de Identity con scopes por endpoint en MS2 y MS4, JWT obligatorio en MS1. MS3 y MS5 aún son anónimos (gaps X-11, X-03).", link: "#seguridad", cta: "Probar accesos" },
     { title: "Patrón Transactional Outbox", state: "ok", text: "Identity, MS1, MS2 y MS5 publican desde su tabla outbox (Joseco); MS3 y MS4 con su tabla propia. Los consumidores deduplican con inbox.", link: "#outbox", cta: "Ver outbox" },
-    { title: "Comunicación interna asíncrona con un broker", state: "ok", text: "RabbitMQ con un exchange fanout por evento y una cola por consumidor; contratos compartidos en Nur.Tricenter.Integration.", link: "#eventos", cta: "Ver eventos" },
-    { title: "Proceso con patrón Saga", state: "out", text: "Retirado de los requisitos del proyecto.", link: null }
+    { title: "Comunicación interna asíncrona con un broker", state: "ok", text: "RabbitMQ con un exchange fanout por evento y una cola por consumidor; contratos compartidos en Nur.Tricenter.Integration.", link: "#eventos", cta: "Ver eventos" }
   ];
 
   function mount(el) {

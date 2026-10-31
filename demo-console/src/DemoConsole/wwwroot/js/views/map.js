@@ -10,7 +10,19 @@ NT.views.mapa = (function () {
   const order = ["identity", "ms1", "ms2", "ms3", "ms4", "ms5"];
   const Y = Object.fromEntries(order.map((id, i) => [id, 100 + i * 92]));
 
-  let root = null, svg = null, trainLayer = null, offs = [], selected = "ms4";
+  let root = null, svg = null, trainLayer = null, offs = [], selected = "ms4", detach = null;
+
+  // Last traffic seen per service, for the hover/pin inspector. Subscribed at load time so the
+  // cache survives leaving and re-entering the view.
+  const last = {};
+  const slot = id => (last[id] = last[id] || {});
+  NT.bus.on("http", r => { if (!r.quiet && T.byId[r.service]) slot(r.service).http = r; });
+  NT.bus.on("event", ev => {
+    if (ev.publisher) slot(ev.publisher).published = ev;
+    (ev.consumers || []).forEach(c => { slot(c).consumed = ev; });
+  });
+  const trainInfo = new Map(); // data-inspect key -> info for moving trains
+  let trainSeq = 0;
 
   const gwPath = (id, i) => {
     const y = Y[id], x = 430 + i * 9, r = 18, dir = y < HUB.y ? -1 : 1;
@@ -18,11 +30,6 @@ NT.views.mapa = (function () {
     return `M ${HUB.x + 80} ${HUB.y} H ${x - r} Q ${x} ${HUB.y} ${x} ${HUB.y + dir * r} V ${y - dir * r} Q ${x} ${y} ${x + r} ${y} H ${STATION_X - 16}`;
   };
   const brokerPath = id => `M ${STATION_X + 16} ${Y[id]} H ${TRUNK_X}`;
-  const restPath = (a, b) => {
-    const y1 = Y[a], y2 = Y[b], bend = 548 - Math.abs(y2 - y1) * 0.12;
-    return `M ${STATION_X - 14} ${y1 + 6} C ${bend} ${y1 + 6}, ${bend} ${y2 - 6}, ${STATION_X - 14} ${y2 - 6}`;
-  };
-
   function draw() {
     const lines = order.map((id, i) => {
       const s = T.byId[id];
@@ -32,13 +39,12 @@ NT.views.mapa = (function () {
 
     const reg = order.map(id => `<path class="reg" d="M 300 120 C 300 ${Y[id] - 40}, 520 ${Y[id]}, ${STATION_X - 14} ${Y[id]}"/>`).join("");
 
-    const rest = T.restLinks.map((l, i) => `<path id="rest-${i}" d="${restPath(l.from, l.to)}" fill="none" stroke="${T.byId[l.from].hex}" stroke-width="2.5" stroke-dasharray="1 6" stroke-linecap="round"><title>${U.esc(T.byId[l.from].name)} llama por REST a ${U.esc(T.byId[l.to].name)}: ${U.esc(l.label)}</title></path>`).join("");
-
     const stations = order.map(id => {
       const s = T.byId[id], y = Y[id];
       const pubs = T.events.filter(e => e.publisher === id).length;
       const subs = T.events.filter(e => e.consumers.includes(id)).length;
-      return `<g class="station" data-id="${id}" tabindex="0" role="button" aria-label="${U.esc(s.name)}">
+      return `<g class="station" data-id="${id}" data-inspect="svc:${id}" tabindex="0" role="button" aria-label="${U.esc(s.name)}">
+        <rect class="hit" x="${STATION_X - 22}" y="${y - 36}" width="330" height="62" fill="transparent"/>
         <circle class="ring" cx="${STATION_X}" cy="${y}" r="15"/>
         <text class="name" x="${STATION_X + 30}" y="${y - 14}">${U.esc(s.name)}</text>
         <text class="db" x="${STATION_X + 30}" y="${y + 25}">BD ${U.esc(s.db)}</text>
@@ -54,7 +60,6 @@ NT.views.mapa = (function () {
       ${reg}
       <path class="line" id="browser-gw" d="M 130 ${HUB.y} H ${HUB.x - 80}" stroke="#1d2b3a"/>
       ${lines}
-      ${rest}
       <path class="trunk" d="M ${TRUNK_X} 70 V ${Y.ms5 + 30}"/>
       <path class="trunk-inner" d="M ${TRUNK_X} 70 V ${Y.ms5 + 30}"/>
 
@@ -78,7 +83,7 @@ NT.views.mapa = (function () {
       <g class="infra" transform="translate(${TRUNK_X - 90} 14)">
         <rect width="180" height="50" rx="8" style="stroke:var(--broker)"/>
         <text x="90" y="24" text-anchor="middle">RabbitMQ</text>
-        <text class="sub" x="90" y="41" text-anchor="middle">19 exchanges fanout</text>
+        <text class="sub" x="90" y="41" text-anchor="middle">${T.events.length} exchanges fanout</text>
       </g>
       <text x="${TRUNK_X + 20}" y="${Y.ms5 + 60}" class="train-label" style="font-weight:400;fill:#56657a" text-anchor="middle">bus de eventos</text>
 
@@ -109,7 +114,7 @@ NT.views.mapa = (function () {
   }
 
   // ---------- animation ----------
-  function ride(d, color, label, duration = 1100) {
+  function ride(d, color, label, duration = 1100, info = null) {
     if (!trainLayer) return Promise.resolve();
     const path = document.createElementNS(SVGNS, "path");
     path.setAttribute("d", d);
@@ -120,6 +125,14 @@ NT.views.mapa = (function () {
     dot.setAttribute("r", "9");
     dot.setAttribute("class", "train");
     dot.setAttribute("fill", color);
+    let key = null;
+    if (info) {
+      key = "train:" + (++trainSeq);
+      trainInfo.set(key, info);
+      dot.setAttribute("data-inspect", key);
+      dot.setAttribute("tabindex", "0");
+      dot.style.pointerEvents = "all";
+    }
     trainLayer.appendChild(dot);
     let text = null;
     if (label) {
@@ -138,7 +151,7 @@ NT.views.mapa = (function () {
         dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y);
         if (text) { text.setAttribute("x", p.x + 14); text.setAttribute("y", p.y - 12); }
         if (k < 1) requestAnimationFrame(step);
-        else setTimeout(() => { path.remove(); dot.remove(); text && text.remove(); resolve(); }, reduce ? 600 : 120);
+        else setTimeout(() => { path.remove(); dot.remove(); text && text.remove(); key && trainInfo.delete(key); resolve(); }, reduce ? 600 : 120);
       };
       requestAnimationFrame(step);
     });
@@ -156,7 +169,7 @@ NT.views.mapa = (function () {
     if (i < 0) return;
     const d = `M 130 ${HUB.y} H ${HUB.x + 80} ` + gwPath(r.service, i).replace(/^M [\d.]+ [\d.]+ /, "");
     const color = r.status >= 400 || r.status === 0 ? "#c62828" : "#1d2b3a";
-    ride(d, color, `${r.method} ${r.status || "×"}`, 900).then(() => flash(r.service));
+    ride(d, color, `${r.method} ${r.status || "×"}`, 900, httpInfo(r)).then(() => flash(r.service));
   }
 
   function onEvent(ev) {
@@ -164,21 +177,69 @@ NT.views.mapa = (function () {
     const pub = T.byId[ev.publisher];
     const yP = Y[ev.publisher];
     if (!ev.consumers.length) {
-      ride(`M ${STATION_X} ${yP} H ${TRUNK_X}`, pub.hex, ev.exchange, 1000);
+      ride(`M ${STATION_X} ${yP} H ${TRUNK_X}`, pub.hex, ev.exchange, 1000, eventInfo(ev));
       return;
     }
     ev.consumers.forEach((c, k) => {
       const yC = Y[c];
       const d = `M ${STATION_X} ${yP} H ${TRUNK_X - 6} V ${yC} H ${STATION_X}`;
-      setTimeout(() => ride(d, pub.hex, k === 0 ? ev.exchange : "", 1800), k * 140);
+      setTimeout(() => ride(d, pub.hex, k === 0 ? ev.exchange : "", 1800, eventInfo(ev, c)), k * 140);
     });
   }
 
-  function onRest(l) {
-    if (!svg) return;
-    const i = T.restLinks.findIndex(x => x.from === l.from && x.to === l.to);
-    const d = i >= 0 ? restPath(l.from, l.to) : restPath(l.from, l.to);
-    ride(d, T.byId[l.from].hex, "REST", 900);
+  // ---------- inspector (hover / click to pin) ----------
+  const section = (label, data, kind) => data === undefined || data === null ? null : { label, data, kind: kind || "json" };
+
+  function httpInfo(r) {
+    const s = T.byId[r.service] || {};
+    return {
+      title: `${r.method} ${r.path}`, subtitle: `${s.name || r.service} · HTTP ${r.status || "sin respuesta"} · ${r.ms} ms`, color: s.hex,
+      sections: [section("Solicitud", r.request === undefined ? "(sin cuerpo)" : r.request, r.request === undefined ? "text" : "json"),
+                 section("Respuesta", r.response === null ? "(sin cuerpo)" : r.response, r.response === null ? "text" : "json")].filter(Boolean)
+    };
+  }
+
+  function eventInfo(ev, to) {
+    const pub = ev.publisher ? T.byId[ev.publisher] : null;
+    const dest = to ? T.byId[to].name : (ev.consumers.length ? ev.consumers.map(c => T.byId[c].name).join(", ") : "sin consumidores");
+    return {
+      title: ev.exchange, subtitle: `${pub ? pub.name : "?"} → ${dest} · ${U.time(ev.receivedAt)}`, color: pub ? pub.hex : undefined,
+      sections: [section("Cuerpo del evento", ev.payload)].filter(Boolean)
+    };
+  }
+
+  function stationInfo(id) {
+    const s = T.byId[id];
+    const pubs = T.events.filter(e => e.publisher === id).map(e => e.name);
+    const subs = T.events.filter(e => e.consumers.includes(id)).map(e => `${e.name} (de ${T.byId[e.publisher].name.split(" ")[0]})`);
+    const h = NT.live.health[id] || {};
+    const l = last[id] || {};
+    const sections = [
+      { label: "Ficha", kind: "kv", data: {
+        Rol: s.role, "Ruta en el gateway": T.prefix(id) + "/**", Consul: s.consul, "Base de datos": s.db, Seguridad: s.auth,
+        Estado: h.status === "passing" ? "en línea" : h.status === "critical" ? "caído" : "sin datos" } },
+      { label: "Publica", kind: "json", data: pubs.length ? pubs : "nada" },
+      { label: "Consume", kind: "json", data: subs.length ? subs : "nada" }
+    ];
+    if (l.published) sections.push({ label: `Último evento publicado: ${l.published.exchange}`, kind: "json", data: l.published.payload });
+    if (l.consumed) sections.push({ label: `Último evento consumido: ${l.consumed.exchange}`, kind: "json", data: l.consumed.payload });
+    if (l.http) {
+      const r = l.http;
+      sections.push({ label: `Última solicitud: ${r.method} ${r.path}`, kind: "json", data: r.request === undefined ? "(sin cuerpo)" : r.request });
+      sections.push({ label: `Última respuesta: HTTP ${r.status || "×"}`, kind: "json", data: r.response === null ? "(sin cuerpo)" : r.response });
+    }
+    return { title: s.name, subtitle: s.role, color: s.hex, sections };
+  }
+
+  function resolveInspect(el) {
+    const key = el && el.getAttribute && el.getAttribute("data-inspect");
+    if (!key) return null;
+    if (key.startsWith("svc:")) return T.byId[key.slice(4)] ? stationInfo(key.slice(4)) : null;
+    return trainInfo.get(key) || null;
+  }
+
+  function attachInspect() {
+    if (NT.inspect && svg) detach = NT.inspect.attach(svg, resolveInspect);
   }
 
   // ---------- side panel ----------
@@ -190,7 +251,6 @@ NT.views.mapa = (function () {
     const pubs = T.events.filter(e => e.publisher === id);
     const subs = T.events.filter(e => e.consumers.includes(id));
     const h = (NT.live.health[id] || {});
-    const rest = T.restLinks.filter(l => l.from === id || l.to === id);
     const detail = root.querySelector("#station-detail");
     if (!detail) return;
     detail.innerHTML = U.html`
@@ -208,8 +268,10 @@ NT.views.mapa = (function () {
         <div><h3>Publica</h3>${pubs.length ? U.raw(pubs.map(e => U.html`<div><code>${e.name}</code></div>`).join("")) : U.raw('<span class="muted">nada</span>')}</div>
         <div><h3>Consume</h3>${subs.length ? U.raw(subs.map(e => U.html`<div><code>${e.name}</code> <span class="muted">de ${T.byId[e.publisher].name.split(" ")[0]}</span></div>`).join("")) : U.raw('<span class="muted">nada</span>')}</div>
       </div>
-      ${rest.length ? U.raw(U.html`<h3 style="margin-top:14px">Llamadas REST internas</h3>${U.raw(rest.map(l => U.html`<div class="muted">${T.byId[l.from].name.split(" ")[0]} → ${T.byId[l.to].name.split(" ")[0]}: ${l.label}</div>`).join(""))}`) : ""}`;
+      <p class="muted" style="margin-top:14px">Sin llamadas REST entre servicios: todo cambio viaja como evento.</p>`;
   }
+
+  let boardPrev = null;
 
   // opts.mini: only the drawing, embedded by another view (the guided flow).
   function mount(el, opts = {}) {
@@ -218,7 +280,8 @@ NT.views.mapa = (function () {
       el.innerHTML = `<svg class="map-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de servicios en vivo"></svg>`;
       svg = el.querySelector("svg");
       draw();
-      offs = [NT.bus.on("http", onHttp), NT.bus.on("event", onEvent), NT.bus.on("rest", onRest), NT.bus.on("health", applyHealth)];
+      attachInspect();
+      offs = [NT.bus.on("http", onHttp), NT.bus.on("event", onEvent), NT.bus.on("health", applyHealth)];
       return;
     }
     el.innerHTML = `
@@ -244,10 +307,22 @@ NT.views.mapa = (function () {
     el.querySelector("#kernels").innerHTML = T.kernels.map(k => U.html`<div class="kernel"><b>${k.id}</b><span>${k.pkg}</span><div class="muted" style="font-size:13px;margin-top:4px">${k.what}</div>
       <div class="users">${U.raw(T.services.filter(s => s.kernels.includes(k.id)).map(s => U.html`<span class="tag" style="background:${s.hex};color:#fff">${s.name.split(" ")[0]}</span>`).join(""))}</div></div>`).join("");
     draw();
-    offs = [NT.bus.on("http", onHttp), NT.bus.on("event", onEvent), NT.bus.on("rest", onRest), NT.bus.on("health", applyHealth)];
+    attachInspect();
+    offs = [NT.bus.on("http", onHttp), NT.bus.on("event", onEvent), NT.bus.on("health", applyHealth)];
+    // The trains already show every event; give the map the full height on small screens.
+    const board = NT.live && NT.live.board;
+    if (board) { boardPrev = board.isCollapsed(); board.collapse(true); }
   }
 
-  function unmount() { offs.forEach(f => f()); offs = []; svg = null; trainLayer = null; }
+  function unmount() {
+    const board = NT.live && NT.live.board;
+    if (board && boardPrev !== null) board.collapse(boardPrev);
+    boardPrev = null;
+    offs.forEach(f => f()); offs = [];
+    if (detach) { detach(); detach = null; }
+    trainInfo.clear();
+    svg = null; trainLayer = null;
+  }
 
   return { mount, unmount };
 })();

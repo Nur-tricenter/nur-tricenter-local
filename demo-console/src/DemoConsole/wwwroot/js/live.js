@@ -83,6 +83,23 @@ NT.live = (function () {
     while (list.children.length > cfg.boardMax) list.lastElementChild.remove();
   }
 
+  // Same logic for the toggle button and for views that need the room (the flow view).
+  const board = {
+    collapse(on) {
+      const el = document.getElementById("board");
+      const btn = document.getElementById("board-toggle");
+      if (!el) return;
+      el.classList.toggle("collapsed", !!on);
+      if (btn) btn.setAttribute("aria-expanded", String(!on));
+    },
+    isCollapsed() {
+      const el = document.getElementById("board");
+      return !!el && el.classList.contains("collapsed");
+    }
+  };
+  const collapse = on => board.collapse(on);
+  const isCollapsed = () => board.isCollapsed();
+
   // ---------- health ----------
   async function pollHealth() {
     try { health = await NT.api.health(); } catch { /* keep last */ }
@@ -118,16 +135,12 @@ NT.live = (function () {
     pollHealth();
     setInterval(pollHealth, cfg.pollConsulMs);
 
-    document.getElementById("board-toggle").addEventListener("click", e => {
-      const board = document.getElementById("board");
-      const collapsed = board.classList.toggle("collapsed");
-      e.currentTarget.setAttribute("aria-expanded", String(!collapsed));
-    });
+    document.getElementById("board-toggle").addEventListener("click", () => collapse(!isCollapsed()));
     document.getElementById("board-list").addEventListener("click", e => {
       const row = e.target.closest(".board-row");
       if (row) { location.hash = "#eventos"; setTimeout(() => NT.bus.emit("focus-event", row.dataset.id), 50); }
     });
   }
 
-  return { start, events, get health() { return health; }, pollHealth };
+  return { start, events, board, get health() { return health; }, pollHealth };
 })();

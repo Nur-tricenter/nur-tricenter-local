@@ -68,16 +68,30 @@ Señalar en este orden:
 
 ### 3. Recorrido de un pedido (6–7 min) — *Recorrido de un pedido*
 
-Usar **Ejecutar paso N** uno por uno (no *Ejecutar todo*) para narrar. Cada paso muestra la petición y
-la respuesta reales; el mini‑mapa anima la llamada y el tablero de abajo muestra los eventos.
+**Qué hay en pantalla** (todo cabe sin hacer scroll, pensado para proyector):
+
+- **Lienzo de servicios (centro):** los 6 servicios, el API Gateway y RabbitMQ. Cada llamada HTTP viaja
+  del navegador al servicio por el gateway; cada evento sale del *outbox* del publicador, cruza el broker y
+  llega al *inbox* de cada consumidor. Los contadores de cada nodo y el último dato recibido se actualizan solos.
+- **Expediente del pedido:** los datos que se van acumulando (paciente, plan, contrato, calendario, paquete, entrega).
+- **Narración:** una frase corta por paso, lo que se debe decir en voz alta.
+- **Línea de pasos:** los 11 pasos con su estado (pendiente, en curso, listo, fallido); se ejecuta paso a paso o todo junto.
+- **Inspector:** pasar el mouse por un nodo, tren o fila muestra el cuerpo real (JSON) de la última petición,
+  respuesta o evento; un clic lo fija a la derecha para leerlo completo (Esc o la X lo cierra).
+
+**Cómo presentarlo:** usar **Ejecutar paso N** uno por uno (no *Ejecutar todo*). Narrar con el texto del paso,
+y antes de pasar al siguiente **pasar el mouse sobre el nodo que acaba de actuar** para enseñar el cuerpo real
+de la petición o del evento; si el jurado pide verlo con calma, hacer clic para fijarlo. El tablero de abajo
+se pliega solo durante el recorrido para dar espacio al lienzo (se puede abrir con *Eventos en vivo*).
+Todo salto entre servicios es un evento: se ve salir del outbox, cruzar RabbitMQ y entrar al inbox del consumidor.
 
 | Paso | Qué decir | Qué señalar |
 |---|---|---|
 | 1 Iniciar sesión | "Todo empieza con un token de Identity." | La llamada `POST /auth/login` |
 | 2 Registrar paciente (MS1) | "MS1 guarda al paciente y publica `paciente-published` desde su outbox; MS3 lo guarda como proyección local." | Evento en el tablero, ahora con consumidor MS3 |
 | 3 Recetas y plan (MS2) | "MS2 crea el plan de 15 días; su modelo de lectura se actualiza de forma eventual, por eso esperamos. Cada receta asignada publica el plan completo (`meal-plan-composition-changed`) y MS4 lo guarda." | Trenes verdes MS2 → MS3/MS4 (`meal-plan-published`, `meal-plan-composition-changed`) |
-| 4 Contratar y cobrar (MS3) | "MS3 **solo acepta el contrato cuando ya proyectó el plan y el paciente a partir de eventos**; no llama a MS1 ni a MS2." | Reintento hasta 201 |
-| 5 Calendario creado (MS4) | "Al cobrar, MS3 publica `contract-activated`; MS4 lo consume y crea el calendario: 15 días pendientes. Sin llamada REST entre los dos." | Tren amarillo MS3 → MS4 y el calendario |
+| 4 Contratar y cobrar (MS3) | "MS3 valida al paciente y el plan en **su propia proyección**, construida con `paciente-published` y `meal-plan-published`; no llama a MS1 ni a MS2 (no hay REST entre servicios). Si aún no llegaron, rechaza el contrato." | Reintento hasta 201 |
+| 5 Calendario creado (MS4) | "Al cobrar, MS3 publica `contract-activated`. MS4 consumió `contract-activated` y creó el calendario: 15 días pendientes. MS3 no le pide nada a MS4: no hay llamada REST entre los dos." | Tren amarillo MS3 → MS4 y el calendario |
 | 6 Dirección y menú (MS4) | "El paciente pone su dirección; MS4 resuelve el menú de mañana con **su propia copia** del plan que MS2 publicó, y publica `production-order-ready`." | Menú en `active-tomorrow` y tren turquesa MS4 → MS3 |
 | 7 Repartidor y ruta (MS5) | "MS5 crea repartidor y ruta; publica `courier-created` y `route-created`." | Trenes azules sin consumidores |
 | 8 Producir y validar (MS3) | "MS3 arma la orden con lo que proyectó de `production-order-ready`, etiqueta y valida el paquete: publica `package-validated`." | Tren amarillo MS3 → MS5 |
@@ -110,7 +124,7 @@ la respuesta reales; el mini‑mapa anima la llamada y el tablero de abajo muest
 ### 7. Cierre (1 min) — *Requisitos del proyecto*
 
 Recorrer la lista: cada requisito tiene su vista. Seguridad aparece como **parcial** a propósito: mejor
-decirlo nosotros que el jurado. El Saga fue retirado de los requisitos.
+decirlo nosotros que el jurado.
 
 > "En resumen: gateway como única entrada, descubrimiento automático con Consul, comunicación
 > asíncrona por RabbitMQ con outbox e inbox, JWT con scopes y cinco microservicios integrados de punta a punta."
