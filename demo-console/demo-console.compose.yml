@@ -21,10 +21,12 @@ services:
     command: ["dotnet", "DemoConsole.dll"]
     volumes:
       - ./src/DemoConsole/bin/Debug/net10.0:/app:ro
-      - ./src/DemoConsole/wwwroot:/app/wwwroot:ro
+      # Mounted outside /app: /app is a read-only mount, so Docker can't create /app/wwwroot in it.
+      - ./src/DemoConsole/wwwroot:/wwwroot:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_WEBROOT: /wwwroot
       Upstreams__Gateway: "http://nur-tricenter-gateway:8080"
       Upstreams__Consul: "http://nur-tricenter-consul:8500"
       Upstreams__RabbitManagement: "http://nur-tricenter-rabbitmq:15672"

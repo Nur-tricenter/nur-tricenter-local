@@ -145,6 +145,7 @@ Stack ready.
   - Consul UI:    http://localhost:8500
   - RabbitMQ UI:  http://localhost:15672  (guest / guest)
   - Gateway:      http://localhost:15005
+  - Demo console: http://localhost:15100  (presentation dashboard)
   - Catalog API:   internal only (reachable through the gateway as /api/catalog/v1/...)
   - Delivery calendar (ms4): internal only (through the gateway as /api/delivery-calendar/v1/...)
   - ms5 API:       internal only (reachable through the gateway as /api/nurtricenter/v1/...)

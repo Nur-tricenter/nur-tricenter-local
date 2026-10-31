@@ -6,6 +6,27 @@ Brings the whole platform up in Docker for local development: the shared infrast
 **This repository is local development only.** Nothing here is deployed: in production the gateway
 and each microservice are published on their own.
 
+## Quick start on a new machine
+
+1. Install **git**, **Docker Desktop** (running), the **.NET SDK 8 and 10**, and **Python 3** (only for the smoke test).
+2. Set the GitHub Packages credentials once (the shared kernels are private): see
+   [Private feed credentials](#private-feed-credentials).
+3. Make sure these host ports are free: `5433` (Postgres), `5672` / `15672` (RabbitMQ), `8500` (Consul),
+   `15005` (gateway), `15100` (demo console).
+4. Clone this repository into an empty folder, then from its root:
+
+   ```powershell
+   .\scripts\setup-project.ps1   # clones every sibling repository, seeds ms5's local .env
+   .\scripts\start-stack.ps1     # builds everything, starts the stack, creates service accounts
+   ```
+
+   (`./scripts/setup-project.sh` and `./scripts/start-stack.sh` on Linux/macOS.)
+5. Open the **demo console** at **http://localhost:15100**: system map, guided end-to-end order,
+   security probes, Consul registry, live RabbitMQ events and outbox rows. Its README and the Spanish
+   presentation guide are in [`demo-console/`](./demo-console/).
+6. Optional check from a terminal: `python scripts/e2e-smoke.py` must end with `ALL GREEN`
+   (the first run right after a start can fail once while the services warm up; run it again).
+
 ## Two ways to start: base vs dev profile
 
 There are two scripts, two intents:
@@ -180,6 +201,9 @@ open http://localhost:15672          # guest / guest
 # Gateway
 curl http://localhost:15005/health
 curl http://localhost:15005/api/catalog/v1/foods
+
+# Demo console (presentation dashboard)
+open http://localhost:15100
 
 # (dev profile only) Catalog Swagger UI
 open http://localhost:18080/swagger
