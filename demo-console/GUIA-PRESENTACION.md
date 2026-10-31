@@ -50,7 +50,7 @@ Señalar en este orden:
 - **Consul (arriba):** líneas punteadas violetas = cada servicio se registra solo.
 - **Estaciones MS1–MS5 + Identity:** cada una con **su propia base de datos** (texto `BD …`).
 - **Bus de RabbitMQ (derecha):** "los servicios no se llaman para avisar cambios; publican eventos".
-- **Punteado fino entre estaciones:** las pocas llamadas REST internas (MS3→MS1, MS3→MS4, MS4→MS2).
+- **Sin líneas finas entre estaciones:** no hay llamadas REST entre servicios; todo lo que se dicen pasa por el bus.
 - **Clic en MS4 Calendario:** panel con qué publica y qué consume, ruta en el gateway, seguridad.
 - **Shared kernels:** "Access, Security e Integration son paquetes NuGet comunes: mismos permisos,
   misma validación JWT y los mismos contratos de eventos en todos los servicios".
@@ -58,7 +58,7 @@ Señalar en este orden:
 ### 2. Seguridad (3 min) — *Identidad y seguridad*
 
 1. Clic en **admin**: mostrar el JWT (tres colores = header, payload, firma), emisor, vencimiento y la lista de scopes.
-2. Clic en **ms4-service**: "una cuenta de servicio solo tiene `catalog.mealPlan:read`, lo mínimo que MS4 necesita para pedir el menú a MS2".
+2. Clic en **ms4-service**: "una cuenta de servicio solo tiene `catalog.mealPlan:read`: un token con el mínimo privilegio. Ningún servicio la usa para llamar a otro (ya no hay REST entre servicios); sirve para mostrar cómo se acota un token".
 3. **Probar todos los accesos** y leer la tabla:
    - **401** sin token → no autenticado.
    - **403** con `ms4-service` → autenticado pero sin el scope.
@@ -74,13 +74,13 @@ la respuesta reales; el mini‑mapa anima la llamada y el tablero de abajo muest
 | Paso | Qué decir | Qué señalar |
 |---|---|---|
 | 1 Iniciar sesión | "Todo empieza con un token de Identity." | La llamada `POST /auth/login` |
-| 2 Registrar paciente (MS1) | "MS1 guarda al paciente y publica `paciente-published` desde su outbox." | Evento en el tablero |
-| 3 Recetas y plan (MS2) | "MS2 crea el plan de 15 días; su modelo de lectura se actualiza de forma eventual, por eso esperamos." | Trenes verdes MS2 → MS3/MS4 (`meal-plan-published`) |
-| 4 Contratar y cobrar (MS3) | "MS3 **solo acepta el contrato cuando ya recibió el plan por evento**, y valida al paciente contra MS1 por REST." | Reintento hasta 201 |
-| 5 Calendario creado (MS4) | "Al cobrar, MS3 pide a MS4 crear el calendario con su cuenta de servicio `ms3-service`: 15 días pendientes." | Respuesta con los días |
-| 6 Dirección y menú (MS4) | "El paciente pone su dirección; MS4 resuelve el menú de mañana preguntando a MS2." | Menú en la respuesta de `active-tomorrow` |
+| 2 Registrar paciente (MS1) | "MS1 guarda al paciente y publica `paciente-published` desde su outbox; MS3 lo guarda como proyección local." | Evento en el tablero, ahora con consumidor MS3 |
+| 3 Recetas y plan (MS2) | "MS2 crea el plan de 15 días; su modelo de lectura se actualiza de forma eventual, por eso esperamos. Cada receta asignada publica el plan completo (`meal-plan-composition-changed`) y MS4 lo guarda." | Trenes verdes MS2 → MS3/MS4 (`meal-plan-published`, `meal-plan-composition-changed`) |
+| 4 Contratar y cobrar (MS3) | "MS3 **solo acepta el contrato cuando ya proyectó el plan y el paciente a partir de eventos**; no llama a MS1 ni a MS2." | Reintento hasta 201 |
+| 5 Calendario creado (MS4) | "Al cobrar, MS3 publica `contract-activated`; MS4 lo consume y crea el calendario: 15 días pendientes. Sin llamada REST entre los dos." | Tren amarillo MS3 → MS4 y el calendario |
+| 6 Dirección y menú (MS4) | "El paciente pone su dirección; MS4 resuelve el menú de mañana con **su propia copia** del plan que MS2 publicó, y publica `production-order-ready`." | Menú en `active-tomorrow` y tren turquesa MS4 → MS3 |
 | 7 Repartidor y ruta (MS5) | "MS5 crea repartidor y ruta; publica `courier-created` y `route-created`." | Trenes azules sin consumidores |
-| 8 Producir y validar (MS3) | "MS3 arma, etiqueta y valida el paquete: publica `package-validated`." | Tren amarillo MS3 → MS5 |
+| 8 Producir y validar (MS3) | "MS3 arma la orden con lo que proyectó de `production-order-ready`, etiqueta y valida el paquete: publica `package-validated`." | Tren amarillo MS3 → MS5 |
 | 9 Entrega asignada | "Aquí el navegador **no llama a nadie**: MS5 consume el evento, agrega la entrega a la ruta y publica `delivery-added-to-route`, que consume MS4. Dos saltos asíncronos." | Tablero: los dos eventos en cadena |
 | 10 Entregar (MS5) | "El repartidor cierra la entrega con foto y firma." (Opcional: elegir **Fallido** en *Resultado*.) | `delivery-completed` |
 | 11 Día cerrado (MS4) | "MS4 cierra el día **solo por el evento** de MS5; nadie lo cambia a mano. Pasamos por los 5 microservicios." | Estado `Delivered` |
@@ -128,7 +128,7 @@ decirlo nosotros que el jurado. El Saga fue retirado de los requisitos.
 | ¿Por qué MS2 tarda en mostrar el plan? | Separa escritura y lectura (modelo de lectura proyectado por su worker): consistencia eventual. |
 | ¿Cómo se comparten los contratos? | Paquete NuGet `Nur.Tricenter.Integration` (kernel compartido, versionado). |
 | ¿Cómo encuentra el gateway a los servicios? | Lee Consul cada 30 s y arma rutas `/api/{servicio}/**` solo hacia instancias sanas. |
-| ¿Por qué hay llamadas REST entre servicios? | Solo donde se necesita respuesta inmediata (validar paciente, crear calendario, menú del día); los avisos de cambio van por eventos. |
+| ¿Hay llamadas REST entre servicios? | No. Ningún servicio llama a otro por HTTP: se dicen todo con eventos por RabbitMQ y cada uno guarda una proyección local de lo que necesita (paciente, plan, menú, orden del día). Solo el navegador entra por el gateway. Límite conocido: sin backfill, un paciente o plan creado antes del despliegue no está en las proyecciones; la demo crea datos nuevos. |
 | ¿La consola lee bases de datos? | Solo lectura y solo para mostrar las tablas outbox/inbox. Todo lo demás, incluidas las búsquedas de calendario, paquetes y entregas, pasa por el gateway con los endpoints de consulta de cada servicio. |
 | ¿Qué falta? | JWT en MS3 y MS5, y relacionar el usuario del token con el paciente (autorización por objeto). |
 

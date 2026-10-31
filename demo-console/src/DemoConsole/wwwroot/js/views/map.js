@@ -237,7 +237,7 @@ NT.views.mapa = (function () {
           <p class="muted" style="margin-top:-4px">Paquetes NuGet comunes que comparten los servicios, así todos hablan el mismo idioma de seguridad y eventos.</p>
           <div class="kernels" id="kernels"></div>
           <h3 style="margin-top:16px">Cómo leer el mapa</h3>
-          <div class="muted">Línea gruesa: ruta del gateway al servicio. Línea hacia la derecha: conexión al broker. Punteado violeta: registro en Consul. Punteado fino: llamada REST interna entre servicios.</div>
+          <div class="muted">Línea gruesa: ruta del gateway al servicio. Línea hacia la derecha: conexión al broker. Punteado violeta: registro en Consul. No hay llamadas REST entre servicios: todo lo que se dicen es un evento por el broker.</div>
         </section>
       </div>`;
     svg = el.querySelector("svg");

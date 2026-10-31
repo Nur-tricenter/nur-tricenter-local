@@ -101,7 +101,8 @@ MIGRATE_DLL="$CATALOG_ROOT/src/Catalog.App/bin/Debug/net8.0/Catalog.App.dll"
 echo "Applying catalog schema ..."
 dotnet "$MIGRATE_DLL" --migrate
 
-# 4. MS4's service account (catalog.mealPlan:read), created through the gateway with the
+# 4. Service accounts, kept for the demo console's security view (no service logs in with them any
+# more: MS3 -> MS4, MS4 -> MS2 and MS3 -> MS1 became events). MS4's (catalog.mealPlan:read), created through the gateway with the
 # seeded admin's token. Idempotent: 409 means it already exists. The gateway learns
 # identity's route from Consul within ~30s, hence the retry loop.
 GATEWAY='http://localhost:15005'
@@ -127,7 +128,8 @@ case "$STATUS" in
     *)   echo "Creating MS4's service account failed with HTTP $STATUS" >&2; exit 1 ;;
 esac
 
-# MS3's service account: MS3 calls MS4 to create the delivery calendar after a payment
+# MS3's service account: unused by MS3 itself since the contract-activated / production-order-ready
+# events replaced its calls to MS4. It used to create the delivery calendar after a payment
 # (deliveryCalendar.calendar:create) and to read tomorrow's production order
 # (deliveryCalendar.productionOrder:read). Same idempotent creation as MS4's.
 STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$GATEWAY/api/identity-service/v1/users" \

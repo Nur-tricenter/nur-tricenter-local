@@ -69,6 +69,8 @@ app.MapGet("/live/lookup/calendar-by-contract/{contractId:guid}", async (Guid co
     await db.CalendarByContractAsync(contractId, ct) is { } r ? Results.Ok(r) : Results.NotFound());
 app.MapGet("/live/lookup/packages-by-order/{orderId:guid}", (Guid orderId, PlatformReader db, CancellationToken ct) =>
     db.PackagesByOrderAsync(orderId, ct));
+app.MapGet("/live/lookup/scheduled-delivery-by-day/{dayId:int}", async (int dayId, PlatformReader db, CancellationToken ct) =>
+    await db.ScheduledDeliveryByDayAsync(dayId, ct) is { } r ? Results.Ok(r) : Results.NotFound());
 app.MapGet("/live/lookup/delivery-by-day/{dayId:int}", async (int dayId, PlatformReader db, CancellationToken ct) =>
     await db.DeliveryByDayAsync(dayId, ct) is { } r ? Results.Ok(r) : Results.NotFound());
 

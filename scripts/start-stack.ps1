@@ -157,9 +157,11 @@ Write-Host "Applying catalog schema ..."
 & dotnet (Join-Path $migrateDll.DirectoryName 'Catalog.App.dll') --migrate
 if ($LASTEXITCODE -ne 0) { throw "Catalog schema migration failed" }
 
-# 4. MS4's service account. MS4 reads meal plans from the catalog (catalog.mealPlan:read) as a
-# service account, not as the administrator. Identity seeds no such account, so it is created
-# here through the gateway with the seeded admin's token. Idempotent: 409 means it exists.
+# 4. Service accounts. No service calls another over HTTP any more (MS3 -> MS4, MS4 -> MS2 and
+# MS3 -> MS1 became events), so MS3 and MS4 no longer log in with them. The accounts are kept
+# because the demo console's security view uses them to show scoped tokens. Identity seeds no
+# such accounts, so they are created here through the gateway with the seeded admin's token.
+# Idempotent: 409 means it exists.
 # The gateway learns identity's route from Consul within ~30s, hence the retry loop.
 $gateway = 'http://localhost:15005'
 $adminToken = $null
@@ -191,9 +193,9 @@ try {
         throw
     }
 }
-# MS3's service account: MS3 calls MS4 to create the delivery calendar after a payment
-# (deliveryCalendar.calendar:create) and to read tomorrow's production order
-# (deliveryCalendar.productionOrder:read). Same idempotent creation as MS4's.
+# MS3's service account (deliveryCalendar.calendar:create, deliveryCalendar.productionOrder:read):
+# unused by MS3 itself since the contract-activated / production-order-ready events replaced its
+# calls to MS4. Same idempotent creation as MS4's.
 $ms3ServiceAccount = @{
     userName = 'ms3-service'
     email    = 'ms3-service@nur.local'

@@ -198,6 +198,50 @@
                           "arguments":  {
 
                                         }
+                      },
+                      {
+                          "name":  "contract-activated",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "production-order-ready",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "meal-plan-composition-changed",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
+                      },
+                      {
+                          "name":  "paciente-published",
+                          "vhost":  "/",
+                          "type":  "fanout",
+                          "durable":  false,
+                          "auto_delete":  false,
+                          "internal":  false,
+                          "arguments":  {
+
+                                        }
                       }
                   ],
     "queues":  [
@@ -500,6 +544,42 @@
                    },
                    {
                        "name":  "ms5.package-validated",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms4.contract-activated",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms3.production-order-ready",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms4.meal-plan-composition-changed",
+                       "vhost":  "/",
+                       "durable":  true,
+                       "auto_delete":  false,
+                       "arguments":  {
+
+                                     }
+                   },
+                   {
+                       "name":  "ms3.paciente-published",
                        "vhost":  "/",
                        "durable":  true,
                        "auto_delete":  false,
@@ -843,6 +923,46 @@
                          "source":  "package-validated",
                          "vhost":  "/",
                          "destination":  "ms5.package-validated",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "contract-activated",
+                         "vhost":  "/",
+                         "destination":  "ms4.contract-activated",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "production-order-ready",
+                         "vhost":  "/",
+                         "destination":  "ms3.production-order-ready",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "meal-plan-composition-changed",
+                         "vhost":  "/",
+                         "destination":  "ms4.meal-plan-composition-changed",
+                         "destination_type":  "queue",
+                         "routing_key":  "",
+                         "arguments":  {
+
+                                       }
+                     },
+                     {
+                         "source":  "paciente-published",
+                         "vhost":  "/",
+                         "destination":  "ms3.paciente-published",
                          "destination_type":  "queue",
                          "routing_key":  "",
                          "arguments":  {
